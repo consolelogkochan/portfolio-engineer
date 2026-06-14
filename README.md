@@ -1,2 +1,19 @@
 # portfolio-engineer
-Personal portfolio site built with Laravel, Inertia, React, and TypeScript
+
+エンジニアとしてのポートフォリオサイト。
+「全体の設計ができた上で、AIによる開発の効率化・自動化を行える」ことを示すことを目的に、
+このサイト自体を一つの作品として、設計・実装の過程を含めて公開しています。
+
+## 技術スタック
+- Laravel / Inertia.js
+- React / TypeScript
+- Tailwind CSS
+- 補助: Claude Code
+
+## 構成の特徴
+コンテンツはデータベースではなくMarkdownファイルで管理する
+フラットファイル構成を採用しています。（詳細は開発と共に追記予定）
+
+## 利用について
+このリポジトリはポートフォリオ閲覧・学習参考を目的に公開しています。
+コードの閲覧・参考はご自由にどうぞ。無断での複製・転用はご遠慮ください。
