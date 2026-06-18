@@ -16,6 +16,12 @@
 
 ## 技術選定の補足
 
+### Tailwind CSS v4（@tailwindcss/vite プラグイン方式）
+Tailwind CSS v4 を採用しています。v4 では設定方式が刷新されており、
+`tailwind.config.js` を使う v3 式ではなく、
+Vite 公式プラグイン（`@tailwindcss/vite`）を `vite.config.js` に追加するだけで動作します。
+v3 式の設定（`tailwind.config.js`、`@tailwind` ディレクティブ等）は混在させません。
+
 ### Inertia.js v2（@inertiajs/react v3.x）を採用した理由
 本プロジェクトの目的は「学習・手堅い土台づくりに基づくポートフォリオサイト作成」です。
 最新の v3 より、運用実績・事例・情報量が豊富な v2 の方が
