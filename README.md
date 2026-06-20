@@ -45,6 +45,20 @@ Laravel の `@inertia` ディレクティブはデフォルトでは旧式の
 INERTIA_USE_SCRIPT_ELEMENT_FOR_INITIAL_PAGE=true
 ```
 
+## ディレクトリ構成
+
+```
+content/          # サイトのコンテンツ（Markdown）。DBの代わりにファイルで管理
+  works/          # 作品（1作品 = 1 Markdownファイル）
+  logs/           # ビルドログ（開発過程の記事）
+app/
+  Services/       # ビジネスロジック（Markdownのパース、画像処理など）
+resources/js/
+  Pages/          # Inertiaのページ（URLと1対1で対応）
+  types/          # TypeScript型定義
+scripts/          # コンテンツ検証など、ビルド補助スクリプト
+```
+
 ## 利用について
 このリポジトリはポートフォリオ閲覧・学習参考を目的に公開しています。
 コードの閲覧・参考はご自由にどうぞ。無断での複製・転用はご遠慮ください。
