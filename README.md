@@ -4,6 +4,8 @@
 「全体の設計ができた上で、AIによる開発の効率化・自動化を行える」ことを示すことを目的に、
 このサイト自体を一つの作品として、設計・実装の過程を含めて公開しています。
 
+[![CI](https://github.com/consolelogkochan/portfolio-engineer/actions/workflows/ci.yml/badge.svg)](https://github.com/consolelogkochan/portfolio-engineer/actions/workflows/ci.yml)
+
 ## 技術スタック
 - Laravel / Inertia.js
 - React / TypeScript
