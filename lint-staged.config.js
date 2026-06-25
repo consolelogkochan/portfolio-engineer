@@ -4,5 +4,5 @@ export default {
 
     // content/**/*.md が変更されたら全件を検証スクリプトで検証
     // 変更ファイルを引数に渡さず固定コマンドを返す関数形式
-    'content/**/*.md': () => './vendor/bin/sail npx tsx scripts/validate-content.ts',
+    'content/**/*.md': () => 'npx tsx scripts/validate-content.ts',
 };
