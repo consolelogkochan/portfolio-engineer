@@ -2,8 +2,7 @@ export default {
     // resources/js 配下の TypeScript / React ファイル
     'resources/js/**/*.{ts,tsx}': ['eslint --fix', 'prettier --write'],
 
-    // TODO: content 配下の Markdown ファイルの検証（例: markdownlint）
-    // 'content/**/*.md': [
-    //   'markdownlint --fix',
-    // ],
+    // content/**/*.md が変更されたら全件を検証スクリプトで検証
+    // 変更ファイルを引数に渡さず固定コマンドを返す関数形式
+    'content/**/*.md': () => './vendor/bin/sail npx tsx scripts/validate-content.ts',
 };
