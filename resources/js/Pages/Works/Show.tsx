@@ -36,7 +36,16 @@ export default function Show(props: Props) {
           <Row label="thumbnail" value={thumbnail} />
         </tbody>
       </table>
-      {/* 確認用表示。本番の体裁はフェーズ5。bodyHtmlは著者管理コンテンツ前提でdangerouslySetInnerHTML使用 */}
+      {/*
+       * dangerouslySetInnerHTML を許容する根拠：
+       * bodyHtml は WorkController でサーバー側に生成済みの HTML 文字列。
+       * 元データは content/works/*.md（Git管理・著者のみ編集可）であり、
+       * ユーザー入力や外部入力は一切経由しない。
+       * PHP側 MarkdownRenderer の allow_unsafe_links=false により
+       * javascript: リンクは除去されている。
+       * この前提（著者管理コンテンツ）が崩れる場合は使用禁止。
+       * 確認用表示。本番の体裁はフェーズ5。
+       */}
       <hr style={{ margin: '2rem 0' }} />
       <div dangerouslySetInnerHTML={{ __html: bodyHtml }} />
     </div>
