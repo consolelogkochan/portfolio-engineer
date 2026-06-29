@@ -7,13 +7,17 @@ namespace App\Http\Controllers;
 use App\Exceptions\ContentNotFoundException;
 use App\Exceptions\ContentParseException;
 use App\Services\ContentRepository;
+use App\Services\MarkdownRenderer;
 use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
 use Inertia\Response;
 
 class WorkController extends Controller
 {
-    public function __construct(private readonly ContentRepository $repository) {}
+    public function __construct(
+        private readonly ContentRepository $repository,
+        private readonly MarkdownRenderer $renderer,
+    ) {}
 
     public function index(): Response
     {
@@ -27,7 +31,6 @@ class WorkController extends Controller
         try {
             $result = $this->repository->getWork($slug);
         } catch (ContentNotFoundException) {
-            // 存在しないslug = 想定内のアクセス。ログ不要
             abort(404);
         } catch (ContentParseException $e) {
             Log::warning('Work skipped due to parse error', [
@@ -37,6 +40,9 @@ class WorkController extends Controller
             abort(404);
         }
 
-        return Inertia::render('Works/Show', $result['frontmatter']);
+        return Inertia::render('Works/Show', [
+            ...$result['frontmatter'],
+            'bodyHtml' => $this->renderer->toHtml($result['body']),
+        ]);
     }
 }

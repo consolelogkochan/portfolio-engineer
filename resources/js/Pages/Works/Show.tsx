@@ -1,6 +1,6 @@
 import { Work } from '@/types/work';
 
-type Props = Work;
+type Props = Work & { bodyHtml: string };
 
 export default function Show(props: Props) {
   const {
@@ -15,6 +15,7 @@ export default function Show(props: Props) {
     aiTools,
     thumbnail,
     featured,
+    bodyHtml,
   } = props;
 
   return (
@@ -35,6 +36,9 @@ export default function Show(props: Props) {
           <Row label="thumbnail" value={thumbnail} />
         </tbody>
       </table>
+      {/* 確認用表示。本番の体裁はフェーズ5。bodyHtmlは著者管理コンテンツ前提でdangerouslySetInnerHTML使用 */}
+      <hr style={{ margin: '2rem 0' }} />
+      <div dangerouslySetInnerHTML={{ __html: bodyHtml }} />
     </div>
   );
 }
