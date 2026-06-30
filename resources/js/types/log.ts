@@ -15,3 +15,7 @@ export const LogSchema = z.object({
 });
 
 export type Log = z.infer<typeof LogSchema>;
+
+export type LogSummary = Pick<Log, 'title' | 'publishedAt' | 'summary' | 'tags'> & {
+  slug: string;
+};
