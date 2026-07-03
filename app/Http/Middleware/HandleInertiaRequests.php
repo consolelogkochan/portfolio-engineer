@@ -37,7 +37,11 @@ class HandleInertiaRequests extends Middleware
     {
         return [
             ...parent::share($request),
-            //
+            // flash はセッションから自動では Inertia props に乗らないため明示的に共有する。
+            // errors と異なり、Inertia 親クラスに flash 用の専用ロジックは存在しない。
+            'flash' => [
+                'success' => fn () => $request->session()->get('success'),
+            ],
         ];
     }
 }
