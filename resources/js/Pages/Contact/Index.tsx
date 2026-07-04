@@ -3,18 +3,32 @@ import { ContactInput, ContactSchema } from '@/types/contact';
 import { useForm, usePage } from '@inertiajs/react';
 import { FormEvent, useState } from 'react';
 
+type ContactFormData = ContactInput & {
+  website: string; // ハニーポット（人間には見えない囮フィールド）
+  form_token: string; // 時間トラップ用トークン
+};
+
 type ServerErrors = Partial<Record<keyof ContactInput, string>>;
 
-export default function Index() {
-  const { props } = usePage<{ flash: { success?: string }; errors: ServerErrors }>();
+type Props = {
+  form_token: string;
+};
+
+export default function Index({ form_token }: Props) {
+  const { props } = usePage<{
+    flash: { success?: string; rate_limited?: string };
+    errors: ServerErrors;
+  }>();
   const flash = props.flash ?? {};
   const serverErrors: ServerErrors = props.errors ?? {};
 
-  const { data, setData, post, processing } = useForm<ContactInput>({
+  const { data, setData, post, processing } = useForm<ContactFormData>({
     name: '',
     email: '',
     subject: '',
     message: '',
+    website: '', // ハニーポット：常に空のまま送信される
+    form_token, // 表示時刻の暗号化トークン
   });
 
   const [clientErrors, setClientErrors] = useState<Partial<Record<keyof ContactInput, string>>>({});
@@ -22,8 +36,13 @@ export default function Index() {
   function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
 
-    // クライアント検証（親切な二層目）：失敗時はサーバーに送らない
-    const result = ContactSchema.safeParse(data);
+    // クライアント検証（親切な二層目）：ユーザー入力フィールドのみ検証
+    const result = ContactSchema.safeParse({
+      name: data.name,
+      email: data.email,
+      subject: data.subject,
+      message: data.message,
+    });
     if (!result.success) {
       const fieldErrors: Partial<Record<keyof ContactInput, string>> = {};
       for (const issue of result.error.issues) {
@@ -40,7 +59,6 @@ export default function Index() {
 
   // クライアントエラーがあればそちら優先、なければサーバーエラーを表示。
   // processing 中（post() 呼び出し〜レスポンス到着）は serverErrors を隠す。
-  // これにより「クライアント検証を通ったのに前回のサーバーエラーが一瞬残る」を防ぐ。
   const errors: Partial<Record<keyof ContactInput, string>> =
     Object.keys(clientErrors).length > 0 ? clientErrors : processing ? {} : serverErrors;
 
@@ -61,10 +79,33 @@ export default function Index() {
         <p style={{ color: 'green', border: '1px solid green', padding: '8px' }}>{flash.success}</p>
       )}
 
+      {flash.rate_limited && (
+        <p style={{ color: '#c60', border: '1px solid #c60', padding: '8px' }}>
+          {flash.rate_limited}
+        </p>
+      )}
+
       <form
         onSubmit={handleSubmit}
         style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}
       >
+        {/* ハニーポット：人間には見えない囮フィールド。支援技術が触れないよう aria-hidden を付ける */}
+        <div aria-hidden="true" style={{ display: 'none' }}>
+          <label htmlFor="website">Website</label>
+          <input
+            id="website"
+            type="text"
+            name="website"
+            value={data.website}
+            onChange={(e) => setData('website', e.target.value)}
+            tabIndex={-1}
+            autoComplete="off"
+          />
+        </div>
+
+        {/* 時間トラップ：暗号化された表示時刻を隠しフィールドで返送 */}
+        <input type="hidden" name="form_token" value={data.form_token} />
+
         <div style={fieldStyle}>
           <label htmlFor="name">お名前 *</label>
           <input

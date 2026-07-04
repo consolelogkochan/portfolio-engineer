@@ -17,4 +17,5 @@ Route::get('/logs', [LogController::class, 'index']);
 Route::get('/logs/{slug}', [LogController::class, 'show']);
 
 Route::get('/contact', [ContactController::class, 'create']);
-Route::post('/contact', [ContactController::class, 'store']);
+// throttle:3,1 = 1分間に3回まで（頻度ベース。中身ベースのスパム判定は ContactRequest が担う）
+Route::post('/contact', [ContactController::class, 'store'])->middleware('throttle:3,1');

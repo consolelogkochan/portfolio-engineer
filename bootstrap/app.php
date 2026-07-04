@@ -1,10 +1,11 @@
 <?php
 
+use App\Http\Middleware\HandleInertiaRequests;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use Illuminate\Http\Exceptions\ThrottleRequestsException;
 use Illuminate\Http\Request;
-use App\Http\Middleware\HandleInertiaRequests;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -21,4 +22,12 @@ return Application::configure(basePath: dirname(__DIR__))
         $exceptions->shouldRenderJsonWhen(
             fn (Request $request) => $request->is('api/*'),
         );
+        // throttle 超過（429）をそのまま返すと Inertia が全画面エラーを表示する。
+        // リダイレクト＋flash に変換し、React 側でメッセージを表示する。
+        $exceptions->render(function (ThrottleRequestsException $e, Request $request) {
+            return redirect()->back()->with(
+                'rate_limited',
+                'しばらく時間をおいてから再度お試しください。',
+            );
+        });
     })->create();
