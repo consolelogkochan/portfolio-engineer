@@ -1,4 +1,5 @@
 import { Work } from '@/types/work';
+import { Head } from '@inertiajs/react';
 
 type Props = Work & { bodyHtml: string };
 
@@ -20,6 +21,7 @@ export default function Show(props: Props) {
 
   return (
     <div style={{ fontFamily: 'monospace', padding: '2rem', maxWidth: '720px' }}>
+      <Head title={title} />
       <h1>{title}</h1>
       <table style={{ borderCollapse: 'collapse', width: '100%' }}>
         <tbody>
