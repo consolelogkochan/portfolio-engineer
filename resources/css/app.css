@@ -1,9 +1,71 @@
 @import 'tailwindcss';
 
-@source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
-@source '../../storage/framework/views/*.php';
+/* ------------------------------------------------------------------
+ * セルフホストフォント（Fontsource v5、サブセット・ウェイト限定）
+ * Noto Sans JP: 本文用。japanese = ひらがな/カタカナ/漢字、latin = ASCII
+ * JetBrains Mono: コード・英数字用。italic は使わないため除外。
+ * ------------------------------------------------------------------ */
+@import '@fontsource/noto-sans-jp/japanese-400.css';
+@import '@fontsource/noto-sans-jp/japanese-700.css';
+@import '@fontsource/noto-sans-jp/latin-400.css';
+@import '@fontsource/noto-sans-jp/latin-700.css';
+
+@import '@fontsource/jetbrains-mono/400.css';
+@import '@fontsource/jetbrains-mono/500.css';
+@import '@fontsource/jetbrains-mono/700.css';
+
+@source '../../resources/js/**/*.tsx';
 
 @theme {
-    --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
-        'Segoe UI Symbol', 'Noto Color Emoji';
+  /* ================================================================
+   * Base layer: 生の色値（OKLCH）
+   * 部品はこの層を直接参照せず、下の semantic 層の変数を使うこと。
+   * ================================================================ */
+
+  /* green スケール: 発光的なターコイズグリーン（hue 155） */
+  --color-green-400: oklch(75% 0.18 155);
+  --color-green-500: oklch(65% 0.22 155);
+  --color-green-600: oklch(55% 0.20 155);
+
+  /* neutral スケール: 僅かに青緑みを含む無彩色（hue 200） */
+  --color-neutral-950: oklch(12% 0.008 200);
+  --color-neutral-900: oklch(17% 0.008 200);
+  --color-neutral-800: oklch(27% 0.008 200);
+  --color-neutral-400: oklch(55% 0.008 200);
+  --color-neutral-100: oklch(93% 0.004 200);
+
+  /* ================================================================
+   * Semantic layer: 用途名。base の var() を経由して参照する。
+   * 部品は semantic を参照し、--color-green-* 等を直接参照しない。
+   * ================================================================ */
+
+  --color-background: var(--color-neutral-950); /* ページ背景 */
+  --color-surface:    var(--color-neutral-900);  /* カード・パネル等の表面 */
+  --color-border:     var(--color-neutral-800);  /* 区切り線・枠線 */
+  --color-text:       var(--color-neutral-100);  /* メインテキスト */
+  --color-text-muted: var(--color-neutral-400);  /* 補助テキスト（ラベル・キャプション） */
+  --color-primary:    var(--color-green-500);    /* アクセント（CTAリンク・ハイライト） */
+  --color-primary-hover: var(--color-green-600); /* プライマリのホバー状態 */
+
+  /* ================================================================
+   * フォント
+   * ================================================================ */
+  --font-sans: 'Noto Sans JP', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+
+  /* ================================================================
+   * 角丸
+   * ================================================================ */
+  --radius-sm: 0.25rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+}
+
+@layer base {
+  /* ダーク基調: 全ページ共通の背景・文字・フォントをトークンで統一 */
+  body {
+    background-color: var(--color-background);
+    color: var(--color-text);
+    font-family: var(--font-sans);
+  }
 }

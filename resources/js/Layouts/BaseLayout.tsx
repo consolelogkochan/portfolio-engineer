@@ -7,23 +7,34 @@ type Props = {
 
 export default function BaseLayout({ children }: Props) {
   return (
-    <>
-      <header>
-        <Link href="/">portfolio-engineer</Link>
-        <nav>
-          <Link href="/works">Works</Link>
-          <Link href="/logs">Logs</Link>
-          <Link href="/about">About</Link>
-          <Link href="/contact">Contact</Link>
+    // body は app.css @layer base で bg-background / text-text / font-sans 適用済み
+    <div className="flex min-h-screen flex-col">
+      <header className="flex items-center justify-between border-b border-border px-6 py-3">
+        {/* サイト名: モノスペース＋グリーンアクセントでエンジニア感を出す */}
+        <Link href="/" className="font-mono font-bold text-primary">
+          portfolio-engineer
+        </Link>
+        <nav className="flex gap-6 text-sm">
+          <Link href="/works" className="text-text-muted hover:text-primary">
+            Works
+          </Link>
+          <Link href="/logs" className="text-text-muted hover:text-primary">
+            Logs
+          </Link>
+          <Link href="/about" className="text-text-muted hover:text-primary">
+            About
+          </Link>
+          <Link href="/contact" className="text-text-muted hover:text-primary">
+            Contact
+          </Link>
         </nav>
       </header>
 
-      {/* 色・フォント等の装飾は 5-2 のデザイントークン導入時に行う */}
-      <main style={{ maxWidth: '960px', margin: '0 auto', padding: '0 1rem' }}>{children}</main>
+      <main className="mx-auto w-full max-w-4xl flex-1 px-4 py-8">{children}</main>
 
-      <footer>
+      <footer className="border-t border-border px-6 py-4 text-center text-sm text-text-muted">
         <p>© {new Date().getFullYear()} portfolio-engineer</p>
       </footer>
-    </>
+    </div>
   );
 }
