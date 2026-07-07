@@ -1,4 +1,5 @@
 // 確認用UI（フェーズ5で本番体裁に整える）
+import Button from '@/Components/ui/Button';
 import { ContactInput, ContactSchema } from '@/types/contact';
 import { useForm, usePage } from '@inertiajs/react';
 import { FormEvent, useState } from 'react';
@@ -154,13 +155,9 @@ export default function Index({ form_token }: Props) {
           {errors.message && <span style={errorStyle}>{errors.message}</span>}
         </div>
 
-        <button
-          type="submit"
-          disabled={processing}
-          style={{ padding: '8px 24px', cursor: processing ? 'not-allowed' : 'pointer' }}
-        >
+        <Button type="submit" disabled={processing}>
           {processing ? '送信中...' : '送信'}
-        </button>
+        </Button>
       </form>
     </div>
   );
