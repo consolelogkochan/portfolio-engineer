@@ -1,3 +1,4 @@
+import Card from '@/Components/ui/Card';
 import Tag from '@/Components/ui/Tag';
 import { Work } from '@/types/work';
 import { Head } from '@inertiajs/react';
@@ -24,43 +25,45 @@ export default function Show(props: Props) {
     <div style={{ fontFamily: 'monospace', padding: '2rem', maxWidth: '720px' }}>
       <Head title={title} />
       <h1>{title}</h1>
-      <table style={{ borderCollapse: 'collapse', width: '100%' }}>
-        <tbody>
-          <Row label="category" value={category} />
-          <Row label="status" value={status} />
-          <Row label="featured" value={String(featured)} />
-          <Row label="publishedAt" value={publishedAt} />
-          <Row label="period.start" value={period.start} />
-          <Row label="period.end" value={period.end ?? '—'} />
-          <Row label="summary" value={summary} />
-          <Row label="role" value={role.join(', ')} />
-          <tr style={{ borderBottom: '1px solid #ddd' }}>
-            <td style={{ padding: '4px 12px 4px 0', color: '#888', whiteSpace: 'nowrap' }}>
-              technologies
-            </td>
-            <td style={{ padding: '4px 0' }}>
-              <div className="flex flex-wrap gap-2">
-                {technologies.map((t) => (
-                  <Tag key={t}>{t}</Tag>
-                ))}
-              </div>
-            </td>
-          </tr>
-          <tr style={{ borderBottom: '1px solid #ddd' }}>
-            <td style={{ padding: '4px 12px 4px 0', color: '#888', whiteSpace: 'nowrap' }}>
-              aiTools
-            </td>
-            <td style={{ padding: '4px 0' }}>
-              <div className="flex flex-wrap gap-2">
-                {aiTools.map((t) => (
-                  <Tag key={t}>{t}</Tag>
-                ))}
-              </div>
-            </td>
-          </tr>
-          <Row label="thumbnail" value={thumbnail} />
-        </tbody>
-      </table>
+      <Card>
+        <table style={{ borderCollapse: 'collapse', width: '100%' }}>
+          <tbody>
+            <Row label="category" value={category} />
+            <Row label="status" value={status} />
+            <Row label="featured" value={String(featured)} />
+            <Row label="publishedAt" value={publishedAt} />
+            <Row label="period.start" value={period.start} />
+            <Row label="period.end" value={period.end ?? '—'} />
+            <Row label="summary" value={summary} />
+            <Row label="role" value={role.join(', ')} />
+            <tr style={{ borderBottom: '1px solid #ddd' }}>
+              <td style={{ padding: '4px 12px 4px 0', color: '#888', whiteSpace: 'nowrap' }}>
+                technologies
+              </td>
+              <td style={{ padding: '4px 0' }}>
+                <div className="flex flex-wrap gap-2">
+                  {technologies.map((t) => (
+                    <Tag key={t}>{t}</Tag>
+                  ))}
+                </div>
+              </td>
+            </tr>
+            <tr style={{ borderBottom: '1px solid #ddd' }}>
+              <td style={{ padding: '4px 12px 4px 0', color: '#888', whiteSpace: 'nowrap' }}>
+                aiTools
+              </td>
+              <td style={{ padding: '4px 0' }}>
+                <div className="flex flex-wrap gap-2">
+                  {aiTools.map((t) => (
+                    <Tag key={t}>{t}</Tag>
+                  ))}
+                </div>
+              </td>
+            </tr>
+            <Row label="thumbnail" value={thumbnail} />
+          </tbody>
+        </table>
+      </Card>
       {/*
        * dangerouslySetInnerHTML を許容する根拠：
        * bodyHtml は WorkController でサーバー側に生成済みの HTML 文字列。
