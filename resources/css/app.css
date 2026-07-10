@@ -23,6 +23,7 @@
    * ================================================================ */
 
   /* green スケール: 発光的なターコイズグリーン（hue 155） */
+  --color-green-300: oklch(82% 0.15 155);
   --color-green-400: oklch(75% 0.18 155);
   --color-green-500: oklch(65% 0.22 155);
   --color-green-600: oklch(55% 0.20 155);
@@ -44,8 +45,9 @@
   --color-border:     var(--color-neutral-800);  /* 区切り線・枠線 */
   --color-text:       var(--color-neutral-100);  /* メインテキスト */
   --color-text-muted: var(--color-neutral-400);  /* 補助テキスト（ラベル・キャプション） */
-  --color-primary:    var(--color-green-500);    /* アクセント（CTAリンク・ハイライト） */
-  --color-primary-hover: var(--color-green-600); /* プライマリのホバー状態 */
+  --color-primary:       var(--color-green-500);  /* アクセント（CTAリンク・ハイライト） */
+  --color-primary-hover: var(--color-green-600);  /* プライマリのホバー状態 */
+  --color-primary-light: var(--color-green-300);  /* プライマリの明るい強調（メタリックグラデーション等） */
 
   /* ================================================================
    * フォント

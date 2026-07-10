@@ -35,3 +35,15 @@ export const WorkSchema = z.object({
 });
 
 export type Work = z.infer<typeof WorkSchema>;
+
+export type WorkSummary = Pick<
+  Work,
+  | 'title'
+  | 'category'
+  | 'status'
+  | 'summary'
+  | 'publishedAt'
+  | 'thumbnail'
+  | 'technologies'
+  | 'featured'
+> & { slug: string };
