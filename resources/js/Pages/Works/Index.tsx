@@ -10,11 +10,15 @@ export default function Index({ works }: Props) {
     <div>
       <h1 className="text-2xl font-bold mb-2">Works</h1>
       <p className="text-text-muted text-sm mb-6">{works.length} 件</p>
-      <div className="flex flex-col gap-4">
-        {works.map((work) => (
-          <WorkCard key={work.slug} work={work} />
-        ))}
-      </div>
+      {works.length === 0 ? (
+        <p className="text-text-muted">まだ作品がありません</p>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {works.map((work) => (
+            <WorkCard key={work.slug} work={work} />
+          ))}
+        </div>
+      )}
     </div>
   );
 }

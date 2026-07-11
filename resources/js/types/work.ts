@@ -28,6 +28,9 @@ export const WorkSchema = z.object({
   aiTools: z.array(z.string()).default([]),
   liveUrl: z.url().optional(),
   repoUrl: z.url().optional(),
+  // 一覧(WorkCard)ではh-96(384px)固定・object-coverで中央クリップ表示される。
+  // カード幅はグリッド列数で変わる（PC3列で幅270px程度〜モバイル1列で画面幅）ため、
+  // 正方形に近い比率（例: 1200x1200程度）・被写体は中央寄せで用意すると崩れにくい。
   thumbnail: z.string(),
   hero: z.string().optional(),
   gallery: z.array(GalleryItemSchema).default([]),

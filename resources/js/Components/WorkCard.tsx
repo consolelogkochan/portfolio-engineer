@@ -27,19 +27,21 @@ export default function WorkCard({ work }: Props) {
         <img
           src={work.thumbnail}
           alt={work.title}
-          className="absolute inset-0 w-full h-full object-contain bg-surface"
+          className="absolute inset-0 w-full h-full object-cover"
         />
       ) : (
         <div className="absolute inset-0 bg-surface" />
       )}
 
       {/* グラデーションオーバーレイ：画像下部を暗くしてテキストを読みやすくする */}
-      <div className="absolute inset-x-0 bottom-0 top-1/3 bg-linear-to-t from-background/90 via-background/60 to-transparent flex flex-col justify-end p-4">
+      <div className="absolute inset-x-0 bottom-0 top-1/3 bg-linear-to-t from-background/95 via-background/80 to-transparent flex flex-col justify-end p-4">
         <div className="flex items-start justify-between gap-2 mb-1">
           <h2 className="text-base font-bold leading-snug">
+            {/* afterの起点(containing block)は絶対配置の親であるグラデーションdiv(top-1/3、高さ=カードの2/3)。
+                -top-1/2はその高さの50%＝カード上部1/3ぶん上に伸ばす指定で、これによりafterの範囲がカード全体（上1/3を含む）に一致する。 */}
             <Link
               href={`/works/${work.slug}`}
-              className="text-text after:content-[''] after:absolute after:inset-0"
+              className="text-text after:content-[''] after:absolute after:inset-x-0 after:bottom-0 after:-top-1/2"
             >
               {work.title}
             </Link>
