@@ -2,6 +2,7 @@ import Card from '@/Components/ui/Card';
 import Tag from '@/Components/ui/Tag';
 import { Work } from '@/types/work';
 import { Head } from '@inertiajs/react';
+import React from 'react';
 
 type Props = Work & { bodyHtml: string };
 
@@ -11,80 +12,106 @@ export default function Show(props: Props) {
     category,
     status,
     summary,
-    publishedAt,
     period,
     role,
     technologies,
     aiTools,
-    thumbnail,
-    featured,
+    liveUrl,
+    repoUrl,
     bodyHtml,
   } = props;
 
   return (
-    <div style={{ fontFamily: 'monospace', padding: '2rem', maxWidth: '720px' }}>
+    <div>
       <Head title={title} />
-      <h1>{title}</h1>
-      <Card>
-        <table style={{ borderCollapse: 'collapse', width: '100%' }}>
-          <tbody>
-            <Row label="category" value={category} />
-            <Row label="status" value={status} />
-            <Row label="featured" value={String(featured)} />
-            <Row label="publishedAt" value={publishedAt} />
-            <Row label="period.start" value={period.start} />
-            <Row label="period.end" value={period.end ?? '—'} />
-            <Row label="summary" value={summary} />
-            <Row label="role" value={role.join(', ')} />
-            <tr style={{ borderBottom: '1px solid #ddd' }}>
-              <td style={{ padding: '4px 12px 4px 0', color: '#888', whiteSpace: 'nowrap' }}>
-                technologies
-              </td>
-              <td style={{ padding: '4px 0' }}>
-                <div className="flex flex-wrap gap-2">
-                  {technologies.map((t) => (
-                    <Tag key={t}>{t}</Tag>
-                  ))}
-                </div>
-              </td>
-            </tr>
-            <tr style={{ borderBottom: '1px solid #ddd' }}>
-              <td style={{ padding: '4px 12px 4px 0', color: '#888', whiteSpace: 'nowrap' }}>
-                aiTools
-              </td>
-              <td style={{ padding: '4px 0' }}>
-                <div className="flex flex-wrap gap-2">
-                  {aiTools.map((t) => (
-                    <Tag key={t}>{t}</Tag>
-                  ))}
-                </div>
-              </td>
-            </tr>
-            <Row label="thumbnail" value={thumbnail} />
-          </tbody>
-        </table>
-      </Card>
-      {/*
-       * dangerouslySetInnerHTML を許容する根拠：
-       * bodyHtml は WorkController でサーバー側に生成済みの HTML 文字列。
-       * 元データは content/works/*.md（Git管理・著者のみ編集可）であり、
-       * ユーザー入力や外部入力は一切経由しない。
-       * PHP側 MarkdownRenderer の allow_unsafe_links=false により
-       * javascript: リンクは除去されている。
-       * この前提（著者管理コンテンツ）が崩れる場合は使用禁止。
-       * 確認用表示。本番の体裁はフェーズ5。
-       */}
-      <hr style={{ margin: '2rem 0' }} />
-      <div dangerouslySetInnerHTML={{ __html: bodyHtml }} />
+
+      <h1 className="text-2xl font-bold mb-1">{title}</h1>
+      <p className="text-text-muted text-sm mb-8">
+        {category} ・ {status}
+      </p>
+
+      <div className="mb-8">
+        <h2 className="text-sm font-mono text-text-muted mb-2">Gallery</h2>
+        <Card className="min-h-64 flex items-center justify-center">
+          <p className="text-text-muted text-sm">ギャラリーは5-10で実装</p>
+        </Card>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+        <div className="space-y-4">
+          <Field label="概要">{summary}</Field>
+          <Field label="分類・状態">
+            {category} ・ {status}
+          </Field>
+          <Field label="期間">
+            {period.start} 〜 {period.end ?? '継続中'}
+          </Field>
+          <Field label="担当">{role.join(', ')}</Field>
+          <Field label="使用技術">
+            <div className="flex flex-wrap gap-2">
+              {technologies.map((t) => (
+                <Tag key={t}>{t}</Tag>
+              ))}
+            </div>
+          </Field>
+          {aiTools.length > 0 && (
+            <Field label="AIツール">
+              <div className="flex flex-wrap gap-2">
+                {aiTools.map((t) => (
+                  <Tag key={t}>{t}</Tag>
+                ))}
+              </div>
+            </Field>
+          )}
+          {liveUrl && (
+            <Field label="Live">
+              <a
+                href={liveUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-primary hover:underline"
+              >
+                Live Demo
+              </a>
+            </Field>
+          )}
+          {repoUrl && (
+            <Field label="Repository">
+              <a
+                href={repoUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-primary hover:underline"
+              >
+                Repository
+              </a>
+            </Field>
+          )}
+        </div>
+
+        <div>
+          <h2 className="text-sm font-mono text-text-muted mb-2">ケーススタディ</h2>
+          {/*
+           * dangerouslySetInnerHTML を許容する根拠：
+           * bodyHtml は WorkController でサーバー側に生成済みの HTML 文字列。
+           * 元データは content/works/*.md（Git管理・著者のみ編集可）であり、
+           * ユーザー入力や外部入力は一切経由しない。
+           * PHP側 MarkdownRenderer の allow_unsafe_links=false により
+           * javascript: リンクは除去されている。
+           * この前提（著者管理コンテンツ）が崩れる場合は使用禁止。
+           */}
+          <div dangerouslySetInnerHTML={{ __html: bodyHtml }} />
+        </div>
+      </div>
     </div>
   );
 }
 
-function Row({ label, value }: { label: string; value: string }) {
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <tr style={{ borderBottom: '1px solid #ddd' }}>
-      <td style={{ padding: '4px 12px 4px 0', color: '#888', whiteSpace: 'nowrap' }}>{label}</td>
-      <td style={{ padding: '4px 0' }}>{value}</td>
-    </tr>
+    <div>
+      <h3 className="text-xs font-mono text-text-muted mb-1">{label}</h3>
+      <div className="text-sm">{children}</div>
+    </div>
   );
 }

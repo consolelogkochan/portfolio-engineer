@@ -21,6 +21,7 @@ export const WorkSchema = z.object({
   publishedAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'YYYY-MM-DD形式で記述'),
   period: z.object({
     start: z.string(),
+    // 省略時はWorks/Showで「継続中」として表示される運用（進行中の案件はendを書かない）。
     end: z.string().optional(),
   }),
   role: z.array(z.string()),
