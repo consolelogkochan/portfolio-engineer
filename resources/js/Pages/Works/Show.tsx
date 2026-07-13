@@ -100,7 +100,7 @@ export default function Show(props: Props) {
            * javascript: リンクは除去されている。
            * この前提（著者管理コンテンツ）が崩れる場合は使用禁止。
            */}
-          <div dangerouslySetInnerHTML={{ __html: bodyHtml }} />
+          <div className="case-study max-w-prose" dangerouslySetInnerHTML={{ __html: bodyHtml }} />
         </div>
       </div>
     </div>
