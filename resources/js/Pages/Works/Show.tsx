@@ -1,3 +1,4 @@
+import Gallery from '@/Components/Gallery';
 import Card from '@/Components/ui/Card';
 import Tag from '@/Components/ui/Tag';
 import { Work } from '@/types/work';
@@ -15,9 +16,11 @@ export default function Show(props: Props) {
     period,
     role,
     technologies,
-    aiTools,
+    aiTools = [],
     liveUrl,
     repoUrl,
+    // frontmatterにgalleryキーが無いとprops上undefinedになる（Zodのdefault([])はPHP側のパースには効かない）
+    gallery = [],
     bodyHtml,
   } = props;
 
@@ -30,15 +33,15 @@ export default function Show(props: Props) {
         {category} ・ {status}
       </p>
 
-      <div className="mb-8">
-        <h2 className="text-sm font-mono text-text-muted mb-2">Gallery</h2>
-        <Card className="min-h-64 flex items-center justify-center">
-          <p className="text-text-muted text-sm">ギャラリーは5-10で実装</p>
-        </Card>
-      </div>
+      {gallery.length > 0 && (
+        <div className="mb-8">
+          <h2 className="text-sm font-mono text-text-muted mb-2">Gallery</h2>
+          <Gallery gallery={gallery} />
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-        <div className="space-y-4">
+        <Card className="space-y-4 md:sticky md:top-8 md:self-start">
           <Field label="概要">{summary}</Field>
           <Field label="分類・状態">
             {category} ・ {status}
@@ -64,30 +67,30 @@ export default function Show(props: Props) {
             </Field>
           )}
           {liveUrl && (
-            <Field label="Live">
+            <Field label="公開URL">
               <a
                 href={liveUrl}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-primary hover:underline"
               >
-                Live Demo
+                サイトを見る
               </a>
             </Field>
           )}
           {repoUrl && (
-            <Field label="Repository">
+            <Field label="リポジトリ">
               <a
                 href={repoUrl}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-primary hover:underline"
               >
-                Repository
+                GitHubで見る
               </a>
             </Field>
           )}
-        </div>
+        </Card>
 
         <div>
           <h2 className="text-sm font-mono text-text-muted mb-2">ケーススタディ</h2>

@@ -7,6 +7,9 @@ const MetricSchema = z.object({
 });
 
 const GalleryItemSchema = z.object({
+  // 詳細(Gallery)ではh-96(384px)固定・object-containで全体表示（切れない・余白は許容）。
+  // 加工前は横長1600x900(16:9)程度で用意する（images:optimizeでmax_width=1200に縮小・webp化される）。
+  // containのため比率を厳密に合わせる必要はない。
   src: z.string(),
   alt: z.string(), // 必須：アクセシビリティを型で強制
   caption: z.string().optional(),

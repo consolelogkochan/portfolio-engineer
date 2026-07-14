@@ -18,7 +18,25 @@ technologies:
   - "Tailwind CSS"
 aiTools:
   - "Claude Code"
+liveUrl: "https://portfolio-engineer.example.com"
+repoUrl: "https://github.com/example/portfolio-engineer"
 thumbnail: "/images/works/portfolio-engineer/thumbnail-test.webp"
+gallery:
+  - src: "/images/works/portfolio-engineer/gallery/portfolio-ver2-1.webp"
+    alt: "portfolio-engineerのトップページ。ヒーローセクションに「Kotaro's Lab」のロゴとキャッチコピーを表示"
+    caption: "トップページ：キャッチコピーで自己紹介"
+  - src: "/images/works/portfolio-engineer/gallery/portfolio-ver2-2.webp"
+    alt: "Worksセクション。開発リソース集約ダッシュボード「Dev-Cockpit」など6件の作品カードを一覧表示"
+    caption: "Works一覧：制作実績をカード形式で紹介"
+  - src: "/images/works/portfolio-engineer/gallery/portfolio-ver2-3.webp"
+    alt: "About meセクション。プロフィールアイコンと経歴・強みを紹介する文章"
+    caption: "About me：経歴と強みを紹介"
+  - src: "/images/works/portfolio-engineer/gallery/portfolio-ver2-4.webp"
+    alt: "My Skills Setセクション。BackendとFrontendに分けた技術スタック一覧"
+    caption: "Skills：Backend/Frontendの技術スタック一覧"
+  - src: "/images/works/portfolio-engineer/gallery/portfolio-ver2-5.webp"
+    alt: "Contact meセクション。name・mail・messageの入力フォーム"
+    caption: "Contact：問い合わせフォーム"
 ---
 
 <!-- ダミーデータ：表示確認用（本文タイポグラフィ確認用サンプル） -->
