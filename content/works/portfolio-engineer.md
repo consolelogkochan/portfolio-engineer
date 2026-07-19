@@ -37,6 +37,15 @@ gallery:
   - src: "/images/works/portfolio-engineer/gallery/portfolio-ver2-5.webp"
     alt: "Contact meセクション。name・mail・messageの入力フォーム"
     caption: "Contact：問い合わせフォーム"
+metrics:
+  - label: "Lighthouse スコア"
+    value: "98"
+    unit: "点"
+  - label: "実装カード数"
+    value: "50"
+    unit: "枚"
+  - label: "デザイントークン数"
+    value: "12"
 ---
 
 <!-- ダミーデータ：表示確認用（本文タイポグラフィ確認用サンプル） -->

@@ -1,4 +1,5 @@
 import Gallery from '@/Components/Gallery';
+import MetricsCard from '@/Components/MetricsCard';
 import Card from '@/Components/ui/Card';
 import Tag from '@/Components/ui/Tag';
 import { Work } from '@/types/work';
@@ -21,6 +22,7 @@ export default function Show(props: Props) {
     repoUrl,
     // frontmatterにgalleryキーが無いとprops上undefinedになる（Zodのdefault([])はPHP側のパースには効かない）
     gallery = [],
+    metrics,
     bodyHtml,
   } = props;
 
@@ -41,56 +43,60 @@ export default function Show(props: Props) {
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-        <Card className="space-y-4 md:sticky md:top-8 md:self-start">
-          <Field label="概要">{summary}</Field>
-          <Field label="分類・状態">
-            {category} ・ {status}
-          </Field>
-          <Field label="期間">
-            {period.start} 〜 {period.end ?? '継続中'}
-          </Field>
-          <Field label="担当">{role.join(', ')}</Field>
-          <Field label="使用技術">
-            <div className="flex flex-wrap gap-2">
-              {technologies.map((t) => (
-                <Tag key={t}>{t}</Tag>
-              ))}
-            </div>
-          </Field>
-          {aiTools.length > 0 && (
-            <Field label="AIツール">
+        <div className="md:sticky md:top-8 md:self-start space-y-8">
+          <MetricsCard metrics={metrics} />
+
+          <Card className="space-y-4">
+            <Field label="概要">{summary}</Field>
+            <Field label="分類・状態">
+              {category} ・ {status}
+            </Field>
+            <Field label="期間">
+              {period.start} 〜 {period.end ?? '継続中'}
+            </Field>
+            <Field label="担当">{role.join(', ')}</Field>
+            <Field label="使用技術">
               <div className="flex flex-wrap gap-2">
-                {aiTools.map((t) => (
+                {technologies.map((t) => (
                   <Tag key={t}>{t}</Tag>
                 ))}
               </div>
             </Field>
-          )}
-          {liveUrl && (
-            <Field label="公開URL">
-              <a
-                href={liveUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-primary hover:underline"
-              >
-                サイトを見る
-              </a>
-            </Field>
-          )}
-          {repoUrl && (
-            <Field label="リポジトリ">
-              <a
-                href={repoUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-primary hover:underline"
-              >
-                GitHubで見る
-              </a>
-            </Field>
-          )}
-        </Card>
+            {aiTools.length > 0 && (
+              <Field label="AIツール">
+                <div className="flex flex-wrap gap-2">
+                  {aiTools.map((t) => (
+                    <Tag key={t}>{t}</Tag>
+                  ))}
+                </div>
+              </Field>
+            )}
+            {liveUrl && (
+              <Field label="公開URL">
+                <a
+                  href={liveUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-primary hover:underline"
+                >
+                  サイトを見る
+                </a>
+              </Field>
+            )}
+            {repoUrl && (
+              <Field label="リポジトリ">
+                <a
+                  href={repoUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-primary hover:underline"
+                >
+                  GitHubで見る
+                </a>
+              </Field>
+            )}
+          </Card>
+        </div>
 
         <div>
           <h2 className="text-sm font-mono text-text-muted mb-2">ケーススタディ</h2>
