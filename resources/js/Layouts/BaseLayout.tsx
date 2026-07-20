@@ -18,9 +18,6 @@ export default function BaseLayout({ children }: Props) {
           <Link href="/works" className="text-text-muted hover:text-primary">
             Works
           </Link>
-          <Link href="/logs" className="text-text-muted hover:text-primary">
-            Logs
-          </Link>
           <Link href="/about" className="text-text-muted hover:text-primary">
             About
           </Link>

@@ -77,26 +77,6 @@ class ContentRepository
     }
 
     /**
-     * 公開済みログ（draft === false）を publishedAt の降順（新しい順）で返す。
-     *
-     * @return array<int, array<string, mixed>>
-     */
-    public function listPublishedLogs(): array
-    {
-        $logs = $this->scanAll(base_path('content/logs'));
-
-        $published = array_values(
-            array_filter($logs, fn(array $l) => ($l['draft'] ?? false) === false),
-        );
-
-        usort($published, fn(array $a, array $b) =>
-            strcmp($b['publishedAt'] ?? '', $a['publishedAt'] ?? ''),
-        );
-
-        return $published;
-    }
-
-    /**
      * 単一ログを取得する（show アクション用）。
      * draft=true のログは「存在するが非公開」として ContentNotPublishedException を投げる。
      *

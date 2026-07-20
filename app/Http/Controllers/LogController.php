@@ -20,13 +20,6 @@ class LogController extends Controller
         private readonly MarkdownRenderer $renderer,
     ) {}
 
-    public function index(): Response
-    {
-        return Inertia::render('Logs/Index', [
-            'logs' => $this->repository->listPublishedLogs(),
-        ]);
-    }
-
     public function show(string $slug): Response
     {
         try {

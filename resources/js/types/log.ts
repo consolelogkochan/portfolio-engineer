@@ -9,13 +9,7 @@ export const LogSchema = z.object({
     .optional(),
   summary: z.string(),
   tags: z.array(z.string()).default([]),
-  relatedWork: z.string().optional(),
-  thumbnail: z.string().optional(),
   draft: z.boolean().default(false),
 });
 
 export type Log = z.infer<typeof LogSchema>;
-
-export type LogSummary = Pick<Log, 'title' | 'publishedAt' | 'summary' | 'tags'> & {
-  slug: string;
-};

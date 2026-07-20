@@ -13,7 +13,6 @@ Route::get('/', function () {
 Route::get('/works', [WorkController::class, 'index']);
 Route::get('/works/{slug}', [WorkController::class, 'show']);
 
-Route::get('/logs', [LogController::class, 'index']);
 Route::get('/logs/{slug}', [LogController::class, 'show']);
 
 Route::get('/contact', [ContactController::class, 'create']);

@@ -3,7 +3,7 @@ import { Log } from '@/types/log';
 type Props = Log & { bodyHtml: string };
 
 export default function Show(props: Props) {
-  const { title, publishedAt, updatedAt, summary, tags, relatedWork, draft, bodyHtml } = props;
+  const { title, publishedAt, updatedAt, summary, tags, draft, bodyHtml } = props;
 
   return (
     <div style={{ fontFamily: 'monospace', padding: '2rem', maxWidth: '720px' }}>
@@ -14,7 +14,6 @@ export default function Show(props: Props) {
           <Row label="updatedAt" value={updatedAt ?? '—'} />
           <Row label="summary" value={summary} />
           <Row label="tags" value={tags.join(', ')} />
-          <Row label="relatedWork" value={relatedWork ?? '—'} />
           <Row label="draft" value={String(draft)} />
         </tbody>
       </table>
