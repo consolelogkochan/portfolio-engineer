@@ -49,7 +49,9 @@ class WorkController extends Controller
         // この前提が崩れる場合（UGC等）は html_input=strip に変更すること。
         return Inertia::render('Works/Show', [
             ...$result['frontmatter'],
-            'bodyHtml' => $this->renderer->toHtml($result['body']),
+            'slug'          => $slug,
+            'bodyHtml'      => $this->renderer->toHtml($result['body']),
+            'hasRelatedLog' => $this->repository->hasPublishedLog($slug),
         ]);
     }
 }

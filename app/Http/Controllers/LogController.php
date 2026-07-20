@@ -44,7 +44,9 @@ class LogController extends Controller
         // - allow_unsafe_links=false により javascript: スキームのリンクは除去される。
         return Inertia::render('Logs/Show', [
             ...$result['frontmatter'],
-            'bodyHtml' => $this->renderer->toHtml($result['body']),
+            'slug'           => $slug,
+            'bodyHtml'       => $this->renderer->toHtml($result['body']),
+            'hasRelatedWork' => $this->repository->hasPublishedWork($slug),
         ]);
     }
 }

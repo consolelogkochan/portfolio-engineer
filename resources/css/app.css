@@ -83,15 +83,12 @@
    * @tailwindcss/typography（prose）は導入せず、既存のダーク＋緑トークンに
    * 合わせて自前で用意。.case-study配下にのみ適用し、他要素には影響しない。
    * ------------------------------------------------------------------ */
-  .case-study h2 {
-    font-size: 1.25rem;
-    font-weight: 700;
-    color: var(--color-heading);
-    margin-top: 2rem;
-    margin-bottom: 0.5rem;
+  .case-study {
+    /* 長いinline code・URL等がスマホ幅で折り返されず横あふれするのを防ぐ */
+    overflow-wrap: break-word;
   }
 
-  .case-study h3 {
+  .case-study h2 {
     font-size: 1.125rem;
     font-weight: 700;
     color: var(--color-heading);
@@ -99,10 +96,36 @@
     margin-bottom: 0.5rem;
   }
 
+  .case-study h3 {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--color-heading);
+    margin-top: 1.25rem;
+    margin-bottom: 0.5rem;
+  }
+
   .case-study p {
+    font-size: 0.9375rem;
     line-height: 1.8;
     color: var(--color-text);
     margin: 1rem 0;
+  }
+
+  /* タブレット以上（mdブレークポイントと統一）：見出し・本文をやや大きく */
+  @media (min-width: 768px) {
+    .case-study h2 {
+      font-size: 1.25rem;
+      margin-top: 2rem;
+    }
+
+    .case-study h3 {
+      font-size: 1.125rem;
+      margin-top: 1.5rem;
+    }
+
+    .case-study p {
+      font-size: 1rem;
+    }
   }
 
   .case-study ul,

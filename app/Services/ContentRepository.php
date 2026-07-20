@@ -95,4 +95,46 @@ class ContentRepository
 
         return $result;
     }
+
+    /**
+     * 指定slugの作品が「公開中」状態で存在するかを確認する。
+     * 存在確認は正常系（無くて当たり前のケースがある）のため、getWorkのように例外は投げずboolで返す。
+     * パースエラー時も安全側（false）に倒す。
+     */
+    public function hasPublishedWork(string $slug): bool
+    {
+        $path = base_path("content/works/{$slug}.md");
+        if (!file_exists($path)) {
+            return false;
+        }
+
+        try {
+            $result = $this->parser->parse($path);
+        } catch (ContentNotFoundException | ContentParseException) {
+            return false;
+        }
+
+        return ($result['frontmatter']['status'] ?? '') === '公開中';
+    }
+
+    /**
+     * 指定slugのログが公開状態（draft !== true）で存在するかを確認する。
+     * 存在確認は正常系（無くて当たり前のケースがある）のため、getLogのように例外は投げずboolで返す。
+     * パースエラー時も安全側（false）に倒す。
+     */
+    public function hasPublishedLog(string $slug): bool
+    {
+        $path = base_path("content/logs/{$slug}.md");
+        if (!file_exists($path)) {
+            return false;
+        }
+
+        try {
+            $result = $this->parser->parse($path);
+        } catch (ContentNotFoundException | ContentParseException) {
+            return false;
+        }
+
+        return ($result['frontmatter']['draft'] ?? false) !== true;
+    }
 }

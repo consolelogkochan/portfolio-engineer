@@ -3,10 +3,11 @@ import MetricsCard from '@/Components/MetricsCard';
 import Card from '@/Components/ui/Card';
 import Tag from '@/Components/ui/Tag';
 import { Work } from '@/types/work';
-import { Head } from '@inertiajs/react';
+import { Head, Link } from '@inertiajs/react';
 import React from 'react';
 
-type Props = Work & { bodyHtml: string };
+// slugはWorkSchemaの一部ではなく、Controllerがルートパラメータから渡すもの
+type Props = Work & { slug: string; bodyHtml: string; hasRelatedLog: boolean };
 
 export default function Show(props: Props) {
   const {
@@ -23,6 +24,8 @@ export default function Show(props: Props) {
     // frontmatterにgalleryキーが無いとprops上undefinedになる（Zodのdefault([])はPHP側のパースには効かない）
     gallery = [],
     metrics,
+    slug,
+    hasRelatedLog,
     bodyHtml,
   } = props;
 
@@ -93,6 +96,13 @@ export default function Show(props: Props) {
                 >
                   GitHubで見る
                 </a>
+              </Field>
+            )}
+            {hasRelatedLog && (
+              <Field label="開発ログ">
+                <Link href={`/logs/${slug}`} className="text-primary hover:underline">
+                  開発の記録を見る
+                </Link>
               </Field>
             )}
           </Card>
