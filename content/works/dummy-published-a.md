@@ -2,8 +2,8 @@
 title: "ダミー作品A（公開中・新しい）"
 category: "個人開発"
 status: "公開中"
-featured: false
-summary: "フィルタ・ソート確認用のダミー作品。publishedAt が新しい方。"
+featured: true
+summary: "フィルタ・ソート確認用のダミー作品。publishedAt が新しい方。トップのfeaturedショーケース確認用に featured:true にしている。"
 publishedAt: "2026-05-01"
 period:
   start: "2026-04-01"

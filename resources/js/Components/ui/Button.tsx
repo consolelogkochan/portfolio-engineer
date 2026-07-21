@@ -18,6 +18,17 @@ const sizeClasses = {
   md: 'px-4 py-2',
 };
 
+// <button>と同じ見た目を<a>（Inertia Link等）にも適用したい箇所向けに公開。
+// <button>を<a>の中にネストするのはHTML上不正（インタラクティブ要素の入れ子）なため、
+// リンクをボタン風に見せたい場合はこの関数でクラスだけ取り出して使う。
+export function buttonClasses({
+  variant = 'primary',
+  size = 'md',
+  className,
+}: Pick<ButtonProps, 'variant' | 'size' | 'className'> = {}) {
+  return [base, variantClasses[variant], sizeClasses[size], className].filter(Boolean).join(' ');
+}
+
 export default function Button({
   variant = 'primary',
   size = 'md',
@@ -25,12 +36,8 @@ export default function Button({
   children,
   ...rest
 }: ButtonProps) {
-  const classes = [base, variantClasses[variant], sizeClasses[size], className]
-    .filter(Boolean)
-    .join(' ');
-
   return (
-    <button className={classes} {...rest}>
+    <button className={buttonClasses({ variant, size, className })} {...rest}>
       {children}
     </button>
   );

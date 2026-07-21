@@ -65,6 +65,23 @@ class ContentRepository
     }
 
     /**
+     * 公開中の作品のうち featured=true のものだけを publishedAt 降順で返す（トップページ用）。
+     * 「featuredだけを見せる」という絞り込み方針はサーバーが担い、フロントは受け取った配列を
+     * そのまま表示することに集中できる（絞り込みロジックの重複・ズレを防ぐ）。
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function listFeaturedWorks(): array
+    {
+        return array_values(
+            array_filter(
+                $this->listPublishedWorks(),
+                fn(array $w) => ($w['featured'] ?? false) === true,
+            ),
+        );
+    }
+
+    /**
      * 単一作品を取得する（show アクション用）。
      *
      * @return array{frontmatter: array<string, mixed>, body: string}
