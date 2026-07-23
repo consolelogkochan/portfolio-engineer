@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AboutController;
 use App\Http\Controllers\ContactController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\LogController;
@@ -12,6 +13,8 @@ Route::get('/works', [WorkController::class, 'index']);
 Route::get('/works/{slug}', [WorkController::class, 'show']);
 
 Route::get('/logs/{slug}', [LogController::class, 'show']);
+
+Route::get('/about', AboutController::class);
 
 Route::get('/contact', [ContactController::class, 'create']);
 // throttle:3,1 = 1分間に3回まで（頻度ベース。中身ベースのスパム判定は ContactRequest が担う）

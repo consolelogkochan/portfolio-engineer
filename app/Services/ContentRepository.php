@@ -82,6 +82,22 @@ class ContentRepository
     }
 
     /**
+     * About固定ページ（content/about.md）を取得する。
+     * slugを取らない単一ファイル固定パスな点が getWork/getLog と異なる。
+     * 「1ファイルしか読まないなら Controller から ContentParser を直接使ってもよい」とも考えたが、
+     * データアクセスを Repository に集約する既存方針（Controller は ContentParser を直接触らない）
+     * との一貫性を優先し、薄いラッパーとしてここに置く。
+     *
+     * @return array{frontmatter: array<string, mixed>, body: string}
+     * @throws ContentNotFoundException
+     * @throws ContentParseException
+     */
+    public function getAbout(): array
+    {
+        return $this->parser->parse(base_path('content/about.md'));
+    }
+
+    /**
      * 単一作品を取得する（show アクション用）。
      *
      * @return array{frontmatter: array<string, mixed>, body: string}

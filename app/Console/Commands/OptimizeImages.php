@@ -16,6 +16,7 @@ class OptimizeImages extends Command
     private const SCAN_DIRS = [
         'public/images/works',
         'public/images/logs',
+        'public/images/about',
     ];
 
     private const EXTENSIONS = ['jpg', 'jpeg', 'png'];
