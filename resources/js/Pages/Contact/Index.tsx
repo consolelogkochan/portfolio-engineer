@@ -1,7 +1,6 @@
-// 確認用UI（フェーズ5で本番体裁に整える）
 import Button from '@/Components/ui/Button';
 import { ContactInput, ContactSchema } from '@/types/contact';
-import { useForm, usePage } from '@inertiajs/react';
+import { Head, useForm, usePage } from '@inertiajs/react';
 import { FormEvent, useState } from 'react';
 
 type ContactFormData = ContactInput & {
@@ -14,6 +13,9 @@ type ServerErrors = Partial<Record<keyof ContactInput, string>>;
 type Props = {
   form_token: string;
 };
+
+const inputClasses =
+  'w-full bg-surface border border-border rounded-md px-3 py-2 text-text placeholder:text-text-muted focus:border-primary focus:outline-none transition-colors';
 
 export default function Index({ form_token }: Props) {
   const { props } = usePage<{
@@ -63,35 +65,31 @@ export default function Index({ form_token }: Props) {
   const errors: Partial<Record<keyof ContactInput, string>> =
     Object.keys(clientErrors).length > 0 ? clientErrors : processing ? {} : serverErrors;
 
-  const fieldStyle = { display: 'flex', flexDirection: 'column' as const, gap: '4px' };
-  const inputStyle = {
-    padding: '6px 8px',
-    fontSize: '14px',
-    width: '100%',
-    boxSizing: 'border-box' as const,
-  };
-  const errorStyle = { color: '#c00', fontSize: '13px' };
-
   return (
-    <div style={{ fontFamily: 'monospace', padding: '2rem', maxWidth: '560px' }}>
-      <h1>お問い合わせ</h1>
+    <div className="max-w-xl mx-auto">
+      <Head title="お問い合わせ" />
+
+      <h1 className="text-2xl font-bold mb-6">お問い合わせ</h1>
 
       {flash.success && (
-        <p style={{ color: 'green', border: '1px solid green', padding: '8px' }}>{flash.success}</p>
+        <p className="border border-primary text-primary bg-surface rounded-md px-4 py-3 text-sm mb-6">
+          {flash.success}
+        </p>
       )}
 
+      {/* throttle:3,1（4-13）超過時、サーバー（bootstrap/app.php）がThrottleRequestsExceptionを
+          redirect()->back()->with('rate_limited', ...) に変換済みのため、通常のflashとして届く。
+          クライアント側で429を検知する必要はない。 */}
       {flash.rate_limited && (
-        <p style={{ color: '#c60', border: '1px solid #c60', padding: '8px' }}>
+        <p className="border border-emphasis text-emphasis bg-surface rounded-md px-4 py-3 text-sm mb-6">
           {flash.rate_limited}
         </p>
       )}
 
-      <form
-        onSubmit={handleSubmit}
-        style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}
-      >
-        {/* ハニーポット：人間には見えない囮フィールド。支援技術が触れないよう aria-hidden を付ける */}
-        <div aria-hidden="true" style={{ display: 'none' }}>
+      <form onSubmit={handleSubmit} className="space-y-5">
+        {/* ハニーポット：人間には見えない囮フィールド。支援技術が触れないよう aria-hidden を付ける。
+            Tailwindのhiddenだけではaria-hidden属性は付与されないため、両方を明示的に維持する。 */}
+        <div aria-hidden="true" className="hidden">
           <label htmlFor="website">Website</label>
           <input
             id="website"
@@ -107,55 +105,63 @@ export default function Index({ form_token }: Props) {
         {/* 時間トラップ：暗号化された表示時刻を隠しフィールドで返送 */}
         <input type="hidden" name="form_token" value={data.form_token} />
 
-        <div style={fieldStyle}>
-          <label htmlFor="name">お名前 *</label>
+        <div className="space-y-1.5">
+          <label htmlFor="name" className="text-sm text-text-muted">
+            お名前 *
+          </label>
           <input
             id="name"
             type="text"
             value={data.name}
             onChange={(e) => setData('name', e.target.value)}
-            style={inputStyle}
+            className={inputClasses}
           />
-          {errors.name && <span style={errorStyle}>{errors.name}</span>}
+          {errors.name && <p className="text-error text-sm">{errors.name}</p>}
         </div>
 
-        <div style={fieldStyle}>
-          <label htmlFor="email">メールアドレス *</label>
+        <div className="space-y-1.5">
+          <label htmlFor="email" className="text-sm text-text-muted">
+            メールアドレス *
+          </label>
           <input
             id="email"
             type="email"
             value={data.email}
             onChange={(e) => setData('email', e.target.value)}
-            style={inputStyle}
+            className={inputClasses}
           />
-          {errors.email && <span style={errorStyle}>{errors.email}</span>}
+          {errors.email && <p className="text-error text-sm">{errors.email}</p>}
         </div>
 
-        <div style={fieldStyle}>
-          <label htmlFor="subject">件名 *</label>
+        <div className="space-y-1.5">
+          <label htmlFor="subject" className="text-sm text-text-muted">
+            件名 *
+          </label>
           <input
             id="subject"
             type="text"
             value={data.subject}
             onChange={(e) => setData('subject', e.target.value)}
-            style={inputStyle}
+            className={inputClasses}
           />
-          {errors.subject && <span style={errorStyle}>{errors.subject}</span>}
+          {errors.subject && <p className="text-error text-sm">{errors.subject}</p>}
         </div>
 
-        <div style={fieldStyle}>
-          <label htmlFor="message">お問い合わせ内容 *</label>
+        <div className="space-y-1.5">
+          <label htmlFor="message" className="text-sm text-text-muted">
+            お問い合わせ内容 *
+          </label>
           <textarea
             id="message"
             rows={6}
             value={data.message}
             onChange={(e) => setData('message', e.target.value)}
-            style={inputStyle}
+            className={inputClasses}
           />
-          {errors.message && <span style={errorStyle}>{errors.message}</span>}
+          {errors.message && <p className="text-error text-sm">{errors.message}</p>}
         </div>
 
-        <Button type="submit" disabled={processing}>
+        <Button type="submit" disabled={processing} className="w-full">
           {processing ? '送信中...' : '送信'}
         </Button>
       </form>
