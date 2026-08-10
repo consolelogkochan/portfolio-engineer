@@ -16,6 +16,8 @@ type Props = { work: WorkSummary };
 
 export default function WorkCard({ work }: Props) {
   return (
+    // h-96は固定高（5-17時点では未対応・記録のみ）：lg:grid-cols-3でカード幅が狭まりTagsが
+    // 増えて折り返すと、overflow-hiddenで見切れる可能性があるが現状のタグ数では実害なし
     <article className="relative overflow-hidden rounded-lg border border-border hover:border-primary transition-colors h-96">
       {work.featured && (
         <span className="absolute top-3 right-3 bg-linear-to-br from-primary-hover via-primary-light to-primary text-background text-xs font-mono px-2 py-0.5 rounded-sm z-10 shadow-[inset_0_1px_1px_rgba(255,255,255,0.25)]">

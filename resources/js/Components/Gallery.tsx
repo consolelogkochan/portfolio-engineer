@@ -45,8 +45,19 @@ export default function Gallery({ gallery }: Props) {
 
   return (
     <div>
+      {/* カウンターは画像の直前に通常フロー（絶対配置ではない）の行として置く。
+          containの余白の出方に依存せず、幅・比率に関わらず画像と重なりようがない。
+          位置は右上のまま（FeaturedShowcase・従来のカウンター位置を踏襲）で見た目の一貫性を保つ */}
+      {multiple && (
+        <div className="flex justify-end mb-1.5 md:mb-2">
+          <span className="text-text-muted text-[10px] md:text-xs font-mono">
+            {selectedIndex + 1} / {gallery.length}
+          </span>
+        </div>
+      )}
+
       {/* px-10: スマホ幅では画像とコンテナの縦横比が近くcontainの余白が出ないため、
-          ボタン/カウンター用のスペースを強制的に確保する（md以上は自然な余白で足りるため解除） */}
+          前後ボタン用のスペースを強制的に確保する（md以上は自然な余白で足りるため解除） */}
       <div className="relative px-10 md:px-0">
         <div
           className="overflow-hidden rounded-lg"
@@ -72,11 +83,6 @@ export default function Gallery({ gallery }: Props) {
 
         {multiple && (
           <>
-            {/* カウンター：containで生まれる余白（画像右上のbg-surface部分）に配置 */}
-            <span className="absolute top-1.5 right-1.5 md:top-2 md:right-2 text-text-muted text-[10px] md:text-xs font-mono">
-              {selectedIndex + 1} / {gallery.length}
-            </span>
-
             <button
               type="button"
               onClick={() => emblaApi?.scrollPrev()}

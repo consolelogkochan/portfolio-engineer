@@ -15,7 +15,7 @@ export default function Home({ featuredWorks }: Props) {
     <div>
       <Head title="portfolio-engineer — AIと作る。判断は、自分で。" />
 
-      <section className="text-center py-12 md:py-20">
+      <section className="text-center py-12 md:py-20 lg:py-24">
         <p className="font-mono text-base md:text-lg lg:text-xl text-text-muted mb-6">
           portfolio-engineer
         </p>
@@ -36,7 +36,7 @@ export default function Home({ featuredWorks }: Props) {
       {/* featuredが0件の場合はFeaturedShowcaseがnullを返しセクションごと消える。
           Works誘導は下に残るため、その場合でも導線は失われない。 */}
       {featuredWorks.length > 0 && (
-        <section className="mb-16 md:mb-24">
+        <section className="mb-16 md:mb-24 lg:mb-28">
           <h2 className="text-sm md:text-base lg:text-lg font-mono text-text-muted mb-4">
             Featured Works
           </h2>
@@ -49,7 +49,8 @@ export default function Home({ featuredWorks }: Props) {
           すべての作品を見る
         </Link>
 
-        <div className="flex justify-center gap-6 mt-6 text-sm">
+        {/* lg以上でナビが小さく感じたため、gapと文字サイズを軽く一段引き上げる（過剰な拡大はしない） */}
+        <div className="flex justify-center gap-6 lg:gap-8 mt-6 text-sm lg:text-base">
           <Link href="/about" className="text-text-muted hover:text-primary">
             About
           </Link>

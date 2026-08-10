@@ -110,6 +110,8 @@ export default function FeaturedShowcase({ works }: Props) {
 function FeaturedCard({ work }: { work: WorkSummary }) {
   return (
     // トップ唯一のリッチな展示：primary-lightの淡いグロー＋枠でWorkCard（一覧）より一段格上に見せる
+    // h-104/h-128は固定高（5-17時点では未対応・記録のみ）：極端に低い横向きビューポートでは
+    // カード1枚で画面縦幅を超えうるが、縦スクロールは許容し実害小と判断
     <article className="relative overflow-hidden rounded-lg border border-primary-light/40 bg-surface shadow-[0_0_48px_-16px_var(--color-primary-light)] h-104 md:h-128">
       {work.thumbnail ? (
         <img

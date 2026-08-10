@@ -18,7 +18,10 @@ export default function Show(props: Props) {
   } = props;
 
   return (
-    <div>
+    // mainのmax-w-4xlより一段狭いmax-w-3xlに委ねる（5-15 Aboutと同じ解）。
+    // max-w-proseのままだと大画面で本文だけ狭まりmx-auto無しで左寄る＝右に不自然な余白ができるため、
+    // ページ全体（見出し・タグ・本文）を同じ幅に揃える。
+    <div className="max-w-3xl mx-auto">
       <Head title={title} />
 
       {hasRelatedWork && (
@@ -52,7 +55,7 @@ export default function Show(props: Props) {
        * javascript: リンクは除去されている。
        * この前提（著者管理コンテンツ）が崩れる場合は使用禁止。
        */}
-      <div className="case-study max-w-prose" dangerouslySetInnerHTML={{ __html: bodyHtml }} />
+      <div className="case-study" dangerouslySetInnerHTML={{ __html: bodyHtml }} />
     </div>
   );
 }

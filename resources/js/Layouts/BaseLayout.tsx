@@ -9,12 +9,13 @@ export default function BaseLayout({ children }: Props) {
   return (
     // body は app.css @layer base で bg-background / text-text / font-sans 適用済み
     <div className="flex min-h-screen flex-col">
-      <header className="flex items-center justify-between border-b border-border px-6 py-3">
-        {/* サイト名: モノスペース＋グリーンアクセントでエンジニア感を出す */}
-        <Link href="/" className="font-mono font-bold text-primary">
+      <header className="flex items-center justify-between border-b border-border px-4 md:px-6 py-3">
+        {/* サイト名: モノスペース＋グリーンアクセントでエンジニア感を出す。
+            375px幅でナビ3項目と並べても横あふれしないよう、モバイルは一段小さく（md以上で現状サイズ） */}
+        <Link href="/" className="font-mono font-bold text-primary text-sm md:text-base">
           portfolio-engineer
         </Link>
-        <nav className="flex gap-6 text-sm">
+        <nav className="flex gap-4 md:gap-6 text-sm">
           <Link href="/works" className="text-text-muted hover:text-primary">
             Works
           </Link>

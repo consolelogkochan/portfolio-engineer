@@ -33,7 +33,7 @@ export default function Show(props: Props) {
     <div>
       <Head title={title} />
 
-      <h1 className="text-2xl font-bold mb-1">{title}</h1>
+      <h1 className="text-xl md:text-2xl font-bold mb-1">{title}</h1>
       <p className="text-text-muted text-sm mb-8">
         {category} ・ {status}
       </p>
