@@ -2,9 +2,10 @@
 // featuredの絞り込みはサーバー（ContentRepository::listFeaturedWorks）が担うため、
 // ここでは受け取った featuredWorks をそのまま FeaturedShowcase に渡すだけ（表示に集中）。
 import FeaturedShowcase from '@/Components/FeaturedShowcase';
+import PageMeta from '@/Components/PageMeta';
 import { buttonClasses } from '@/Components/ui/Button';
 import { WorkSummary } from '@/types/work';
-import { Head, Link } from '@inertiajs/react';
+import { Link } from '@inertiajs/react';
 
 type Props = {
   featuredWorks: WorkSummary[];
@@ -13,7 +14,8 @@ type Props = {
 export default function Home({ featuredWorks }: Props) {
   return (
     <div>
-      <Head title="portfolio-engineer — AIと作る。判断は、自分で。" />
+      {/* トップはtitle未指定＝「portfolio-engineer」単体（app.tsxのcallback参照） */}
+      <PageMeta description="AIと協働し、判断を重ねるエンジニアのポートフォリオ" />
 
       <section className="text-center py-12 md:py-20 lg:py-24">
         <p className="font-mono text-base md:text-lg lg:text-xl text-text-muted mb-6">

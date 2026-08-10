@@ -1,8 +1,8 @@
 // About は works/logs のような複数コンテンツの一覧・詳細ではなく単一固定ページ。
 // 更新頻度が低く1件しかないため、Zodスキーマ・validate-content への追加は行わず、
 // props の型は素朴な type 定義のみで表現する（AboutController::__invoke 参照）。
+import PageMeta from '@/Components/PageMeta';
 import Tag from '@/Components/ui/Tag';
-import { Head } from '@inertiajs/react';
 import React from 'react';
 
 type Props = {
@@ -20,7 +20,8 @@ export default function About({ name, title, location, github, avatar, skills, b
     // mainのmax-w-4xlより一段狭いmax-w-3xlで全体を包む（中間案）。
     // グリッドと本文を同じラッパーで揃えることで、幅は絞りつつ「2カラムと本文の幅は揃える」を維持する
     <div className="max-w-3xl mx-auto">
-      <Head title="About" />
+      {/* description=肩書き（titleフィールド）、ogImage=アバター（プレースホルダより本人の写真の方が有用と判断） */}
+      <PageMeta title="About" description={title} ogImage={avatar} />
 
       <div className="grid grid-cols-1 md:grid-cols-[auto_1fr] gap-8 mb-12">
         {/* 画像の背景が明るいため、border でダークなサイト背景との境界を明確にする */}

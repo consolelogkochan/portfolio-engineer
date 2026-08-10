@@ -1,6 +1,7 @@
+import PageMeta from '@/Components/PageMeta';
 import Button from '@/Components/ui/Button';
 import { ContactInput, ContactSchema } from '@/types/contact';
-import { Head, useForm, usePage } from '@inertiajs/react';
+import { useForm, usePage } from '@inertiajs/react';
 import { FormEvent, useState } from 'react';
 
 type ContactFormData = ContactInput & {
@@ -67,7 +68,7 @@ export default function Index({ form_token }: Props) {
 
   return (
     <div className="max-w-xl mx-auto">
-      <Head title="お問い合わせ" />
+      <PageMeta title="Contact" description="お問い合わせはこちら" />
 
       <h1 className="text-2xl font-bold mb-6">お問い合わせ</h1>
 

@@ -1,9 +1,10 @@
 import Gallery from '@/Components/Gallery';
 import MetricsCard from '@/Components/MetricsCard';
+import PageMeta from '@/Components/PageMeta';
 import Card from '@/Components/ui/Card';
 import Tag from '@/Components/ui/Tag';
 import { Work } from '@/types/work';
-import { Head, Link } from '@inertiajs/react';
+import { Link } from '@inertiajs/react';
 import React from 'react';
 
 // slugはWorkSchemaの一部ではなく、Controllerがルートパラメータから渡すもの
@@ -27,11 +28,12 @@ export default function Show(props: Props) {
     slug,
     hasRelatedLog,
     bodyHtml,
+    thumbnail,
   } = props;
 
   return (
     <div>
-      <Head title={title} />
+      <PageMeta title={title} description={summary} ogImage={thumbnail} ogType="article" />
 
       <h1 className="text-xl md:text-2xl font-bold mb-1">{title}</h1>
       <p className="text-text-muted text-sm mb-8">

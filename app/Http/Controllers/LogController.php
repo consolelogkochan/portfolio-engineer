@@ -37,6 +37,20 @@ class LogController extends Controller
             abort(404);
         }
 
+        $hasRelatedWork = $this->repository->hasPublishedWork($slug);
+
+        // OGP画像：対応作品（同slug）があればそのthumbnailを使う。無ければnullを返し、
+        // フロント（PageMeta）側のデフォルトプレースホルダに委ねる（パスの二重管理を避ける）。
+        $ogImage = null;
+        if ($hasRelatedWork) {
+            try {
+                $work    = $this->repository->getWork($slug);
+                $ogImage = $work['frontmatter']['thumbnail'] ?? null;
+            } catch (ContentNotFoundException | ContentParseException) {
+                // hasPublishedWorkの直後でも稀に競合しうる。失敗時はプレースホルダにフォールバック
+            }
+        }
+
         // bodyHtml を dangerouslySetInnerHTML で出力することを許容する根拠：
         // - ソースは content/logs/*.md（Gitリポジトリ内・著者管理）であり、
         //   ユーザー入力・外部APIなど未検証データは一切経由しない。
@@ -46,7 +60,8 @@ class LogController extends Controller
             ...$result['frontmatter'],
             'slug'           => $slug,
             'bodyHtml'       => $this->renderer->toHtml($result['body']),
-            'hasRelatedWork' => $this->repository->hasPublishedWork($slug),
+            'hasRelatedWork' => $hasRelatedWork,
+            'ogImage'        => $ogImage,
         ]);
     }
 }

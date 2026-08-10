@@ -82,6 +82,27 @@ class ContentRepository
     }
 
     /**
+     * 公開ログ（draft !== true）を publishedAt の降順（新しい順）で返す。
+     * 一覧ページ自体は5-12で廃止済みだが、sitemap生成のためにslug収集用として存在する。
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function listPublishedLogs(): array
+    {
+        $logs = $this->scanAll(base_path('content/logs'));
+
+        $published = array_values(
+            array_filter($logs, fn(array $l) => ($l['draft'] ?? false) !== true),
+        );
+
+        usort($published, fn(array $a, array $b) =>
+            strcmp($b['publishedAt'] ?? '', $a['publishedAt'] ?? ''),
+        );
+
+        return $published;
+    }
+
+    /**
      * About固定ページ（content/about.md）を取得する。
      * slugを取らない単一ファイル固定パスな点が getWork/getLog と異なる。
      * 「1ファイルしか読まないなら Controller から ContentParser を直接使ってもよい」とも考えたが、

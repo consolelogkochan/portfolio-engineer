@@ -43,6 +43,9 @@ class HandleInertiaRequests extends Middleware
                 'success'      => fn () => $request->session()->get('success'),
                 'rate_limited' => fn () => $request->session()->get('rate_limited'),
             ],
+            // og:url・og:image を絶対URLで組むためにフロント（PageMeta）へ共有する。
+            // SSR無し（window.location）に依存せず、config('app.url')を単一の情報源にする。
+            'app_url' => config('app.url'),
         ];
     }
 }

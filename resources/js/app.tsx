@@ -1,10 +1,14 @@
 import '../css/app.css';
 import BaseLayout from './Layouts/BaseLayout';
+import { pageTitle } from './lib/siteMeta';
 import { createInertiaApp, type ResolvedComponent } from '@inertiajs/react';
 import { createRoot } from 'react-dom/client';
 import { type ReactNode } from 'react';
 
 createInertiaApp({
+  // 各ページは <Head title="About"> のように生のページ名だけ渡し、
+  // サイト名サフィックスの付与はここに一元化する（二重管理を避ける）。
+  title: (title) => pageTitle(title),
   resolve: (name) => {
     const pages = import.meta.glob<{ default: ResolvedComponent }>('./Pages/**/*.tsx', {
       eager: true,
