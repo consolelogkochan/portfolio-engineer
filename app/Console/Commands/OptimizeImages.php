@@ -17,6 +17,10 @@ class OptimizeImages extends Command
         'public/images/works',
         'public/images/logs',
         'public/images/about',
+        // public/images/og は意図的に対象外（5-15でaboutを足したのとは逆の判断）。
+        // OGP画像はSNS/チャットのプレビューbot（一部）がwebpに対応していないため、
+        // og:imageに使う画像はpng/jpgのまま配信する必要がある。webp化してしまうと
+        // プレビューが表示されないSNSが出てくるため、ここには追加しないこと。
     ];
 
     private const EXTENSIONS = ['jpg', 'jpeg', 'png'];
