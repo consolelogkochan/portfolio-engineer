@@ -42,6 +42,12 @@
      neutral-950(L12%)上で読める明度・彩度に、他スケールと揃えたトーンで選定。 */
   --color-red-400: oklch(72% 0.19 25);
 
+  /* blue / amber スケール: ErrorPage（404等）のシンタックスハイライト専用（6-2）。
+     サイト全体のアクセント色（primary=green等）ではなく、コード風表示の配色のためだけに用意する。
+     用途はsemantic層のコメントを参照。 */
+  --color-blue-400: oklch(72% 0.17 240); /* keyword用（hue 240） */
+  --color-amber-500: oklch(76% 0.13 78); /* class用・黄土色（hue 78。orangeのhue55とは別相） */
+
   /* neutral スケール: 僅かに青緑みを含む無彩色（hue 200） */
   --color-neutral-950: oklch(12% 0.008 200);
   --color-neutral-900: oklch(17% 0.008 200);
@@ -65,6 +71,12 @@
   --color-emphasis:      var(--color-orange-400);  /* 本文中の強調表現（strong・インラインコード）共通のアクセント */
   --color-heading:       var(--color-primary);  /* 本文見出し。サイト共通のアクセントグリーンに統一 */
   --color-error:         var(--color-red-400);  /* バリデーションエラー表示用（フォームのフィールドエラー等） */
+
+  /* ErrorPage（404等）のシンタックスハイライト専用（6-2）。
+     サイト全体のアクセント色（primary・emphasis・error等）とは役割が異なり、
+     「コード風表示」の配色だけに使う。他コンポーネントで流用しないこと。 */
+  --color-syntax-keyword: var(--color-blue-400);  /* throw/new等のキーワード、タグ名<a> */
+  --color-syntax-class:   var(--color-amber-500); /* 例外クラス名（PageNotFoundException等） */
 
   /* ================================================================
    * フォント
