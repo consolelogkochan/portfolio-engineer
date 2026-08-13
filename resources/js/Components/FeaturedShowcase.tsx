@@ -56,9 +56,9 @@ export default function FeaturedShowcase({ works }: Props) {
         onKeyDown={multiple ? handleKeyDown : undefined}
       >
         <div className="flex">
-          {works.map((work) => (
+          {works.map((work, i) => (
             <div key={work.slug} className="relative flex-[0_0_100%] min-w-0">
-              <FeaturedCard work={work} />
+              <FeaturedCard work={work} loading={i === 0 ? 'eager' : 'lazy'} />
             </div>
           ))}
         </div>
@@ -107,7 +107,7 @@ export default function FeaturedShowcase({ works }: Props) {
   );
 }
 
-function FeaturedCard({ work }: { work: WorkSummary }) {
+function FeaturedCard({ work, loading }: { work: WorkSummary; loading: 'eager' | 'lazy' }) {
   return (
     // トップ唯一のリッチな展示：primary-lightの淡いグロー＋枠でWorkCard（一覧）より一段格上に見せる
     // h-104/h-128は固定高（5-17時点では未対応・記録のみ）：極端に低い横向きビューポートでは
@@ -117,6 +117,7 @@ function FeaturedCard({ work }: { work: WorkSummary }) {
         <img
           src={work.thumbnail}
           alt={work.title}
+          loading={loading}
           className="absolute inset-0 w-full h-full object-cover"
         />
       ) : (

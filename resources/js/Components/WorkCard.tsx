@@ -29,6 +29,7 @@ export default function WorkCard({ work }: Props) {
         <img
           src={work.thumbnail}
           alt={work.title}
+          loading="lazy"
           className="absolute inset-0 w-full h-full object-cover"
         />
       ) : (

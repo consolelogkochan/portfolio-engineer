@@ -74,6 +74,7 @@ export default function Gallery({ gallery }: Props) {
                 <img
                   src={item.src}
                   alt={item.alt}
+                  loading={i === 0 ? 'eager' : 'lazy'}
                   className="absolute inset-0 w-full h-full object-contain"
                 />
               </div>
