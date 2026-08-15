@@ -110,8 +110,8 @@ export default function FeaturedShowcase({ works }: Props) {
 function FeaturedCard({ work, loading }: { work: WorkSummary; loading: 'eager' | 'lazy' }) {
   return (
     // トップ唯一のリッチな展示：primary-lightの淡いグロー＋枠でWorkCard（一覧）より一段格上に見せる
-    // h-104/h-128は固定高（5-17時点では未対応・記録のみ）：極端に低い横向きビューポートでは
-    // カード1枚で画面縦幅を超えうるが、縦スクロールは許容し実害小と判断
+    // 見送り（5-17記録）：h-104/h-128は固定高。極端に低い横向きビューポートではカード1枚で
+    // 画面縦幅を超えうるが、縦スクロールは許容し実害小と判断。対応タイミング：7-5で実際のコンテンツを見て要判断
     <article className="relative overflow-hidden rounded-lg border border-primary-light/40 bg-surface shadow-[0_0_48px_-16px_var(--color-primary-light)] h-104 md:h-128">
       {work.thumbnail ? (
         <img
@@ -124,17 +124,19 @@ function FeaturedCard({ work, loading }: { work: WorkSummary; loading: 'eager' |
         <div className="absolute inset-0 bg-surface" />
       )}
 
-      {/* グラデーションオーバーレイ：画像下部を暗くしてテキストを読みやすくする（WorkCardと同じ手法） */}
-      <div className="absolute inset-x-0 bottom-0 top-1/3 bg-linear-to-t from-background/95 via-background/85 to-transparent flex flex-col justify-end p-6 md:p-10">
+      {/* グラデーションオーバーレイ：画像下部を暗くしてテキストを読みやすくする（装飾のみ、Linkは含まない。WorkCardと同じ手法） */}
+      <div className="absolute inset-x-0 bottom-0 top-1/3 bg-linear-to-t from-background/95 via-background/85 to-transparent" />
+
+      {/* テキスト＆当たり判定コンテナ：inset-0でカード全体を占め、flexで内容を下寄せする（WorkCardと同じ手法）。
+          Linkのafter:inset-0はこのdiv（＝カード全体と同じ範囲）を基準にするため、当たり判定は常にカード全体になる。 */}
+      <div className="absolute inset-0 flex flex-col justify-end p-6 md:p-10">
         <p className="text-primary-light text-xs md:text-sm font-mono mb-2 tracking-wide">
           ★ 注目の作品
         </p>
         <h3 className="text-xl md:text-3xl font-bold leading-snug mb-3">
-          {/* カード全体クリックは擬似要素パターン（WorkCardと同じ）：リンクはタイトル1つに保ち、
-              after:content-[''] after:absolute after:inset-0 相当でクリック領域をカード全体に広げる */}
           <Link
             href={`/works/${work.slug}`}
-            className="text-text after:content-[''] after:absolute after:inset-x-0 after:bottom-0 after:-top-1/2"
+            className="text-text after:content-[''] after:absolute after:inset-0"
           >
             {work.title}
           </Link>

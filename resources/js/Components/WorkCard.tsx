@@ -16,8 +16,8 @@ type Props = { work: WorkSummary };
 
 export default function WorkCard({ work }: Props) {
   return (
-    // h-96は固定高（5-17時点では未対応・記録のみ）：lg:grid-cols-3でカード幅が狭まりTagsが
-    // 増えて折り返すと、overflow-hiddenで見切れる可能性があるが現状のタグ数では実害なし
+    // 見送り（5-17記録）：h-96は固定高。lg:grid-cols-3でカード幅が狭まりTagsが増えて折り返すと、
+    // overflow-hiddenで見切れる可能性があるが現状のタグ数では実害なし。対応タイミング：7-5で実際のコンテンツを見て要判断
     <article className="relative overflow-hidden rounded-lg border border-border hover:border-primary transition-colors h-96">
       {work.featured && (
         <span className="absolute top-3 right-3 bg-linear-to-br from-primary-hover via-primary-light to-primary text-background text-xs font-mono px-2 py-0.5 rounded-sm z-10 shadow-[inset_0_1px_1px_rgba(255,255,255,0.25)]">
@@ -36,15 +36,18 @@ export default function WorkCard({ work }: Props) {
         <div className="absolute inset-0 bg-surface" />
       )}
 
-      {/* グラデーションオーバーレイ：画像下部を暗くしてテキストを読みやすくする */}
-      <div className="absolute inset-x-0 bottom-0 top-1/3 bg-linear-to-t from-background/95 via-background/80 to-transparent flex flex-col justify-end p-4">
+      {/* グラデーションオーバーレイ：画像下部を暗くしてテキストを読みやすくする（装飾のみ、Linkは含まない） */}
+      <div className="absolute inset-x-0 bottom-0 top-1/3 bg-linear-to-t from-background/95 via-background/80 to-transparent" />
+
+      {/* テキスト＆当たり判定コンテナ：inset-0でカード全体を占め、flexで内容を下寄せする（見た目はグラデーションと同じ位置のまま）。
+          Linkのafter:inset-0はこのdiv（＝カード全体と同じ範囲）を基準にするため、当たり判定は常にカード全体になる
+          （グラデーションの見た目top-1/3とは独立しており、暗黙の連動はない）。 */}
+      <div className="absolute inset-0 flex flex-col justify-end p-4">
         <div className="flex items-start justify-between gap-2 mb-1">
           <h2 className="text-base font-bold leading-snug">
-            {/* afterの起点(containing block)は絶対配置の親であるグラデーションdiv(top-1/3、高さ=カードの2/3)。
-                -top-1/2はその高さの50%＝カード上部1/3ぶん上に伸ばす指定で、これによりafterの範囲がカード全体（上1/3を含む）に一致する。 */}
             <Link
               href={`/works/${work.slug}`}
-              className="text-text after:content-[''] after:absolute after:inset-x-0 after:bottom-0 after:-top-1/2"
+              className="text-text after:content-[''] after:absolute after:inset-0"
             >
               {work.title}
             </Link>

@@ -11,8 +11,8 @@ export default function MetricsCard({ metrics }: Props) {
 
   return (
     <Card>
-      {/* flex-wrap/overflow-x未対応（5-17時点では未対応・記録のみ）：指標が増える/値が長くなると
-          横あふれしうるが、現状の指標数・値の桁数では実害なし。7-5で実際のコンテンツを見て要判断 */}
+      {/* 見送り（5-17記録）：flex-wrap/overflow-x未対応。指標が増える/値が長くなると横あふれしうるが、
+          現状の指標数・値の桁数では実害なし。対応タイミング：7-5で実際のコンテンツを見て要判断 */}
       <div className="flex divide-x divide-border">
         {metrics.map((metric) => (
           <div key={metric.label} className="flex-1 text-center px-2 first:pl-0 last:pr-0">

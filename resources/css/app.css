@@ -35,18 +35,19 @@
   --color-green-500: oklch(65% 0.22 155);
   --color-green-600: oklch(55% 0.20 155);
 
-  /* orange スケール: 本文中のインラインコード、強調用（hue 55） */
-  --color-orange-400: oklch(75% 0.15 55);
-
-  /* red スケール: バリデーションエラー用（hue 25。orange(hue55)/green(hue155)と衝突しない暖色）。
+  /* red スケール: バリデーションエラー用（hue 25。amber(hue78)/green(hue155)と衝突しない暖色）。
      neutral-950(L12%)上で読める明度・彩度に、他スケールと揃えたトーンで選定。 */
   --color-red-400: oklch(72% 0.19 25);
 
-  /* blue / amber スケール: ErrorPage（404等）のシンタックスハイライト専用（6-2）。
-     サイト全体のアクセント色（primary=green等）ではなく、コード風表示の配色のためだけに用意する。
-     用途はsemantic層のコメントを参照。 */
-  --color-blue-400: oklch(72% 0.17 240); /* keyword用（hue 240） */
-  --color-amber-500: oklch(76% 0.13 78); /* class用・黄土色（hue 78。orangeのhue55とは別相） */
+  /* blue スケール: ErrorPage（404等）のシンタックスハイライト専用（6-2、keyword用・hue 240）。
+     サイト全体のアクセント色（primary=green等）ではなく、コード風表示の配色のためだけに用意する。 */
+  --color-blue-400: oklch(72% 0.17 240);
+
+  /* amber スケール（黄土色・hue 78）: emphasis（本文中のstrong・インラインコード）と
+     syntax-class（ErrorPageの例外クラス名表示）で共有する副アクセント色。
+     6-5でorange-400（旧emphasis専用色・hue55）を廃止しこちらに一本化した。
+     用途ごとの意味づけはsemantic層（--color-emphasis / --color-syntax-class）のコメントを参照。 */
+  --color-amber-500: oklch(76% 0.13 78);
 
   /* neutral スケール: 僅かに青緑みを含む無彩色（hue 200） */
   --color-neutral-950: oklch(12% 0.008 200);
@@ -70,7 +71,9 @@
   --color-primary:       var(--color-green-500);  /* アクセント（CTAリンク・ハイライト） */
   --color-primary-hover: var(--color-green-600);  /* プライマリのホバー状態 */
   --color-primary-light: var(--color-green-300);  /* プライマリの明るい強調（メタリックグラデーション等） */
-  --color-emphasis:      var(--color-orange-400);  /* 本文中の強調表現（strong・インラインコード）共通のアクセント */
+  --color-emphasis:      var(--color-amber-500);  /* 本文中の強調表現（strong・インラインコード）共通のアクセント。
+                                                      syntax-classと同じamber-500を参照するが、
+                                                      「本文の強調」と「コード風表示」で用途が異なるため名前を分けている（6-5で統合） */
   --color-heading:       var(--color-primary);  /* 本文見出し。サイト共通のアクセントグリーンに統一 */
   --color-error:         var(--color-red-400);  /* バリデーションエラー表示用（フォームのフィールドエラー等） */
 
@@ -78,7 +81,8 @@
      サイト全体のアクセント色（primary・emphasis・error等）とは役割が異なり、
      「コード風表示」の配色だけに使う。他コンポーネントで流用しないこと。 */
   --color-syntax-keyword: var(--color-blue-400);  /* throw/new等のキーワード、タグ名<a> */
-  --color-syntax-class:   var(--color-amber-500); /* 例外クラス名（PageNotFoundException等） */
+  --color-syntax-class:   var(--color-amber-500); /* 例外クラス名（PageNotFoundException等）。
+                                                      emphasisと同じamber-500（色は共有、用途名は分離、6-5で統合） */
 
   /* ================================================================
    * フォント
@@ -114,11 +118,12 @@
     overflow-wrap: break-word;
   }
 
-  /* Issue（5-17 記録・未対応）: .case-study pre / pre code 未定義
-   * 将来 case-study 本文にフェンスコードブロック（```）が来ると、<pre>はwhite-space:pre
+  /* 見送り（5-17記録）: .case-study pre / pre code 未定義
+   * 内容：case-study本文にフェンスコードブロック（```）が来ると、<pre>はwhite-space:pre
    * のためoverflow-wrapが効かず、overflow-xも未指定のためスマホ幅で横あふれする。
-   * 現状 content/*.md にコードブロックは無く未発火（5-9でコードはGitHub誘導と決定したため）。
-   * 対応が必要になったら .case-study pre に overflow-x: auto 等を追加すること。 */
+   * 現状：content/*.md にコードブロックは無く未発火（5-9でコードはGitHub誘導と決定したため）。
+   * 対応タイミング：実際にフェンスコードブロックが必要になった時点で、
+   *   .case-study pre に overflow-x: auto 等を追加する。 */
 
   .case-study h2 {
     font-size: 1.125rem;
