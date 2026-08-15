@@ -23,10 +23,10 @@ class MarkdownRenderer
         // CommonMarkCoreExtension を明示登録する Environment 方式。
         // 将来の拡張（脚注・テーブル等）は addExtension() で追加できる。
         $environment = new Environment([
-            'html_input'         => 'allow',
+            'html_input' => 'allow',
             'allow_unsafe_links' => false,
         ]);
-        $environment->addExtension(new CommonMarkCoreExtension());
+        $environment->addExtension(new CommonMarkCoreExtension);
 
         $this->converter = new MarkdownConverter($environment);
     }

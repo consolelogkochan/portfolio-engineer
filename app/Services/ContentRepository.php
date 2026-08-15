@@ -11,6 +11,24 @@ use Illuminate\Support\Facades\Log;
 
 class ContentRepository
 {
+    /**
+     * types/work.ts の WorkSchema で .default(...) が付くフィールドと同じデフォルト値。
+     * frontmatterにキーが無い場合にフロントへ渡す値をここで一元管理する（単一の真実の源）。
+     */
+    private const array WORK_DEFAULTS = [
+        'featured' => false,
+        'aiTools' => [],
+        'gallery' => [],
+    ];
+
+    /**
+     * types/log.ts の LogSchema で .default(...) が付くフィールドと同じデフォルト値。
+     */
+    private const array LOG_DEFAULTS = [
+        'tags' => [],
+        'draft' => false,
+    ];
+
     public function __construct(private readonly ContentParser $parser) {}
 
     /**
@@ -22,7 +40,7 @@ class ContentRepository
      */
     public function scanAll(string $dir): array
     {
-        if (!is_dir($dir)) {
+        if (! is_dir($dir)) {
             return [];
         }
 
@@ -31,11 +49,11 @@ class ContentRepository
         foreach (glob("{$dir}/*.md") ?: [] as $path) {
             $slug = basename($path, '.md');
             try {
-                $result  = $this->parser->parse($path);
+                $result = $this->parser->parse($path);
                 $items[] = array_merge(['slug' => $slug], $result['frontmatter']);
-            } catch (ContentNotFoundException | ContentParseException $e) {
+            } catch (ContentNotFoundException|ContentParseException $e) {
                 Log::warning('Content skipped during scan', [
-                    'path'  => $path,
+                    'path' => $path,
                     'error' => $e->getMessage(),
                 ]);
             }
@@ -54,11 +72,10 @@ class ContentRepository
         $works = $this->scanAll(base_path('content/works'));
 
         $published = array_values(
-            array_filter($works, fn(array $w) => ($w['status'] ?? '') === '公開中'),
+            array_filter($works, fn (array $w) => ($w['status'] ?? '') === '公開中'),
         );
 
-        usort($published, fn(array $a, array $b) =>
-            strcmp($b['publishedAt'] ?? '', $a['publishedAt'] ?? ''),
+        usort($published, fn (array $a, array $b) => strcmp($b['publishedAt'] ?? '', $a['publishedAt'] ?? ''),
         );
 
         return $published;
@@ -76,7 +93,7 @@ class ContentRepository
         return array_values(
             array_filter(
                 $this->listPublishedWorks(),
-                fn(array $w) => ($w['featured'] ?? false) === true,
+                fn (array $w) => ($w['featured'] ?? false) === true,
             ),
         );
     }
@@ -92,11 +109,10 @@ class ContentRepository
         $logs = $this->scanAll(base_path('content/logs'));
 
         $published = array_values(
-            array_filter($logs, fn(array $l) => ($l['draft'] ?? false) !== true),
+            array_filter($logs, fn (array $l) => ($l['draft'] ?? false) !== true),
         );
 
-        usort($published, fn(array $a, array $b) =>
-            strcmp($b['publishedAt'] ?? '', $a['publishedAt'] ?? ''),
+        usort($published, fn (array $a, array $b) => strcmp($b['publishedAt'] ?? '', $a['publishedAt'] ?? ''),
         );
 
         return $published;
@@ -110,6 +126,7 @@ class ContentRepository
      * との一貫性を優先し、薄いラッパーとしてここに置く。
      *
      * @return array{frontmatter: array<string, mixed>, body: string}
+     *
      * @throws ContentNotFoundException
      * @throws ContentParseException
      */
@@ -122,12 +139,16 @@ class ContentRepository
      * 単一作品を取得する（show アクション用）。
      *
      * @return array{frontmatter: array<string, mixed>, body: string}
+     *
      * @throws ContentNotFoundException
      * @throws ContentParseException
      */
     public function getWork(string $slug): array
     {
-        return $this->parser->parse(base_path("content/works/{$slug}.md"));
+        $result = $this->parser->parse(base_path("content/works/{$slug}.md"));
+        $result['frontmatter'] = array_merge(self::WORK_DEFAULTS, $result['frontmatter']);
+
+        return $result;
     }
 
     /**
@@ -135,6 +156,7 @@ class ContentRepository
      * draft=true のログは「存在するが非公開」として ContentNotPublishedException を投げる。
      *
      * @return array{frontmatter: array<string, mixed>, body: string}
+     *
      * @throws ContentNotFoundException
      * @throws ContentParseException
      * @throws ContentNotPublishedException
@@ -142,8 +164,9 @@ class ContentRepository
     public function getLog(string $slug): array
     {
         $result = $this->parser->parse(base_path("content/logs/{$slug}.md"));
+        $result['frontmatter'] = array_merge(self::LOG_DEFAULTS, $result['frontmatter']);
 
-        if (($result['frontmatter']['draft'] ?? false) === true) {
+        if ($result['frontmatter']['draft'] === true) {
             throw new ContentNotPublishedException("Draft log is not public: {$slug}");
         }
 
@@ -158,13 +181,13 @@ class ContentRepository
     public function hasPublishedWork(string $slug): bool
     {
         $path = base_path("content/works/{$slug}.md");
-        if (!file_exists($path)) {
+        if (! file_exists($path)) {
             return false;
         }
 
         try {
             $result = $this->parser->parse($path);
-        } catch (ContentNotFoundException | ContentParseException) {
+        } catch (ContentNotFoundException|ContentParseException) {
             return false;
         }
 
@@ -179,13 +202,13 @@ class ContentRepository
     public function hasPublishedLog(string $slug): bool
     {
         $path = base_path("content/logs/{$slug}.md");
-        if (!file_exists($path)) {
+        if (! file_exists($path)) {
             return false;
         }
 
         try {
             $result = $this->parser->parse($path);
-        } catch (ContentNotFoundException | ContentParseException) {
+        } catch (ContentNotFoundException|ContentParseException) {
             return false;
         }
 

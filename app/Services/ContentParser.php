@@ -19,7 +19,7 @@ class ContentParser
 
     public function __construct()
     {
-        $this->parser = new FrontMatterParser(new SymfonyYamlFrontMatterParser());
+        $this->parser = new FrontMatterParser(new SymfonyYamlFrontMatterParser);
     }
 
     /**
@@ -27,23 +27,24 @@ class ContentParser
      * HTML変換・スキーマ検証は行わない。
      *
      * @return array{frontmatter: array<string, mixed>, body: string}
+     *
      * @throws ContentNotFoundException ファイルが存在しない・読めない場合
-     * @throws ContentParseException    frontmatterのパース失敗・必須フィールド欠落の場合
+     * @throws ContentParseException frontmatterのパース失敗・必須フィールド欠落の場合
      */
     public function parse(string $path): array
     {
         // ガードa: ファイル存在・読み取り可能チェック
-        if (!file_exists($path)) {
+        if (! file_exists($path)) {
             throw new ContentNotFoundException("File not found: {$path}");
         }
-        if (!is_readable($path)) {
+        if (! is_readable($path)) {
             throw new ContentNotFoundException("File not readable: {$path}");
         }
 
         // ガードb: frontmatterのパース
         try {
             $markdown = file_get_contents($path);
-            $result   = $this->parser->parse($markdown);
+            $result = $this->parser->parse($markdown);
         } catch (InvalidFrontMatterException $e) {
             throw new ContentParseException(
                 "Failed to parse frontmatter in: {$path}",
@@ -64,14 +65,14 @@ class ContentParser
 
         return [
             'frontmatter' => $frontmatter,
-            'body'        => trim($result->getContent()),
+            'body' => trim($result->getContent()),
         ];
     }
 
     /**
      * YAMLパーサが \DateTimeInterface に変換した値を YYYY-MM-DD 文字列に戻す。
      *
-     * @param array<string, mixed> $data
+     * @param  array<string, mixed>  $data
      * @return array<string, mixed>
      */
     private function normalizeDates(array $data): array

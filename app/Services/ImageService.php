@@ -15,7 +15,7 @@ class ImageService
 
     public function __construct()
     {
-        $this->manager = new ImageManager(new Driver());
+        $this->manager = new ImageManager(new Driver);
     }
 
     /**
@@ -23,8 +23,8 @@ class ImageService
      * 「渡された1枚を確実に変換する」だけに徹する。
      * 存在チェック・スキップ判断は持たない（呼び出し元の責務）。
      *
-     * @param int $maxWidth  この幅を超える場合のみ縮小。超えなければ縮小しない（拡大もしない）
-     * @param int $quality   WebP 品質（0〜100）
+     * @param  int  $maxWidth  この幅を超える場合のみ縮小。超えなければ縮小しない（拡大もしない）
+     * @param  int  $quality  WebP 品質（0〜100）
      */
     public function optimize(
         string $sourcePath,

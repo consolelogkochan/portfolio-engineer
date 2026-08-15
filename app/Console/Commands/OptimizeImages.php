@@ -11,6 +11,7 @@ use Throwable;
 class OptimizeImages extends Command
 {
     protected $signature = 'images:optimize {--force : スキップ判定を無視して全件処理}';
+
     protected $description = '画像を WebP に変換・最適化する（冪等）';
 
     private const SCAN_DIRS = [
@@ -28,8 +29,8 @@ class OptimizeImages extends Command
     public function handle(ImageService $service): int
     {
         $maxWidth = (int) config('image.max_width', 1200);
-        $quality  = (int) config('image.webp_quality', 80);
-        $force    = (bool) $this->option('force');
+        $quality = (int) config('image.webp_quality', 80);
+        $force = (bool) $this->option('force');
 
         $success = 0;
         $failure = 0;
@@ -37,7 +38,7 @@ class OptimizeImages extends Command
 
         foreach (self::SCAN_DIRS as $relDir) {
             $dir = base_path($relDir);
-            if (!is_dir($dir)) {
+            if (! is_dir($dir)) {
                 continue;
             }
 
@@ -45,19 +46,20 @@ class OptimizeImages extends Command
                 $destPath = $this->webpPath($sourcePath);
 
                 // 冪等チェック：.webp が存在し元より新しければスキップ
-                if (!$force && $this->isUpToDate($sourcePath, $destPath)) {
-                    $this->line("  <fg=gray>SKIP</>  " . $this->relative($sourcePath));
+                if (! $force && $this->isUpToDate($sourcePath, $destPath)) {
+                    $this->line('  <fg=gray>SKIP</>  '.$this->relative($sourcePath));
                     $skipped++;
+
                     continue;
                 }
 
                 try {
                     $service->optimize($sourcePath, $destPath, $maxWidth, $quality);
-                    $this->line("  <info>OK</info>    " . $this->relative($sourcePath));
+                    $this->line('  <info>OK</info>    '.$this->relative($sourcePath));
                     $success++;
                 } catch (Throwable $e) {
                     // 1件壊れても全体を止めない（scanAll と同じ思想）
-                    $this->line("  <error>FAIL</error>  " . $this->relative($sourcePath) . " — " . $e->getMessage());
+                    $this->line('  <error>FAIL</error>  '.$this->relative($sourcePath).' — '.$e->getMessage());
                     $failure++;
                 }
             }
@@ -72,7 +74,7 @@ class OptimizeImages extends Command
     /** 指定ディレクトリ配下の対象画像パスを再帰的に収集 */
     private function collectImages(string $dir): array
     {
-        $files    = [];
+        $files = [];
         $iterator = new \RecursiveIteratorIterator(
             new \RecursiveDirectoryIterator($dir, \FilesystemIterator::SKIP_DOTS)
         );
@@ -101,6 +103,6 @@ class OptimizeImages extends Command
 
     private function relative(string $path): string
     {
-        return str_replace(base_path() . '/', '', $path);
+        return str_replace(base_path().'/', '', $path);
     }
 }

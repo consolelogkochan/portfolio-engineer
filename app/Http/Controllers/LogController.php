@@ -31,7 +31,7 @@ class LogController extends Controller
             abort(404);
         } catch (ContentParseException $e) {
             Log::warning('Log skipped due to parse error', [
-                'slug'  => $slug,
+                'slug' => $slug,
                 'error' => $e->getMessage(),
             ]);
             abort(404);
@@ -44,9 +44,9 @@ class LogController extends Controller
         $ogImage = null;
         if ($hasRelatedWork) {
             try {
-                $work    = $this->repository->getWork($slug);
+                $work = $this->repository->getWork($slug);
                 $ogImage = $work['frontmatter']['thumbnail'] ?? null;
-            } catch (ContentNotFoundException | ContentParseException) {
+            } catch (ContentNotFoundException|ContentParseException) {
                 // hasPublishedWorkの直後でも稀に競合しうる。失敗時はプレースホルダにフォールバック
             }
         }
@@ -58,10 +58,10 @@ class LogController extends Controller
         // - allow_unsafe_links=false により javascript: スキームのリンクは除去される。
         return Inertia::render('Logs/Show', [
             ...$result['frontmatter'],
-            'slug'           => $slug,
-            'bodyHtml'       => $this->renderer->toHtml($result['body']),
+            'slug' => $slug,
+            'bodyHtml' => $this->renderer->toHtml($result['body']),
             'hasRelatedWork' => $hasRelatedWork,
-            'ogImage'        => $ogImage,
+            'ogImage' => $ogImage,
         ]);
     }
 }

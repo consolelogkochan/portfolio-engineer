@@ -19,11 +19,10 @@ export default function Show(props: Props) {
     period,
     role,
     technologies,
-    aiTools = [],
+    aiTools,
     liveUrl,
     repoUrl,
-    // frontmatterにgalleryキーが無いとprops上undefinedになる（Zodのdefault([])はPHP側のパースには効かない）
-    gallery = [],
+    gallery,
     metrics,
     slug,
     hasRelatedLog,

@@ -43,7 +43,7 @@ return Application::configure(basePath: dirname(__DIR__))
             $statusCode = $response->getStatusCode();
 
             // 開発・テスト環境ではLaravelの詳細デバッグ画面を優先する（カスタムErrorPageは本番相当のみ）。
-            if (app()->environment(['local', 'testing']) || !in_array($statusCode, [403, 404, 500, 503], true)) {
+            if (app()->environment(['local', 'testing']) || ! in_array($statusCode, [403, 404, 500, 503], true)) {
                 return $response;
             }
 

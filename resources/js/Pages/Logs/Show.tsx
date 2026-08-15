@@ -13,18 +13,8 @@ type Props = Log & {
 };
 
 export default function Show(props: Props) {
-  const {
-    title,
-    publishedAt,
-    updatedAt,
-    // frontmatterにtagsキーが無いとprops上undefinedになりうるため防御的にデフォルトを設ける
-    tags = [],
-    slug,
-    hasRelatedWork,
-    bodyHtml,
-    ogImage,
-    summary,
-  } = props;
+  const { title, publishedAt, updatedAt, tags, slug, hasRelatedWork, bodyHtml, ogImage, summary } =
+    props;
 
   return (
     // mainのmax-w-4xlより一段狭いmax-w-3xlに委ねる（5-15 Aboutと同じ解）。

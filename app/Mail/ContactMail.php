@@ -29,7 +29,7 @@ class ContactMail extends Mailable
             // 件名はフレームワークに渡す（手動文字列結合でヘッダを作らない）。
             // ユーザー入力をヘッダに直接連結するとメールヘッダインジェクションのリスクがあるため、
             // Laravel の Envelope が内部でエスケープ処理を行う。
-            subject: '【お問い合わせ】' . $this->contactSubject,
+            subject: '【お問い合わせ】'.$this->contactSubject,
             // ユーザーのメールアドレスは Reply-To に置く。
             // From に置くと送信元詐称になるため厳禁。
             replyTo: [new Address($this->userEmail, $this->userName)],
@@ -41,8 +41,8 @@ class ContactMail extends Mailable
         return new Content(
             markdown: 'mail.contact',
             with: [
-                'userName'    => $this->userName,
-                'userEmail'   => $this->userEmail,
+                'userName' => $this->userName,
+                'userEmail' => $this->userEmail,
                 'userMessage' => $this->userMessage,
             ],
         );

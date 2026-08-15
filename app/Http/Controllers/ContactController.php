@@ -34,20 +34,21 @@ class ContactController extends Controller
             // 静かに弾く：ボットにはメールが送られたように見せ、実際には送らない。
             // 誤検知把握のためログに残す。
             Log::warning('Contact spam detected', [
-                'reason'     => $spamReason,
-                'ip'         => $request->ip(),
+                'reason' => $spamReason,
+                'ip' => $request->ip(),
                 'user_agent' => $request->userAgent(),
             ]);
+
             return redirect()->back()->with('success', 'お問い合わせを受け付けました。折り返しご連絡いたします。');
         }
 
         $data = $request->validated();
 
         Mail::to(config('mail.contact_to'))->send(new ContactMail(
-            userName:       $data['name'],
-            userEmail:      $data['email'],
+            userName: $data['name'],
+            userEmail: $data['email'],
             contactSubject: $data['subject'],
-            userMessage:    $data['message'],
+            userMessage: $data['message'],
         ));
 
         return redirect()->back()->with('success', 'お問い合わせを受け付けました。折り返しご連絡いたします。');
