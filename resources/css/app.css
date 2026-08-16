@@ -4,6 +4,7 @@
  * セルフホストフォント（Fontsource v5、サブセット・ウェイト限定）
  * Noto Sans JP: 本文用。japanese = ひらがな/カタカナ/漢字、latin = ASCII
  * JetBrains Mono: コード・英数字用。italic は使わないため除外。
+ * 両フォントとも400（本文）・700（font-bold）のみ使用（500等の中間ウェイトは未使用のため未読み込み、6-6で整理）。
  * ------------------------------------------------------------------ */
 @import '@fontsource/noto-sans-jp/japanese-400.css';
 @import '@fontsource/noto-sans-jp/japanese-700.css';
@@ -11,7 +12,6 @@
 @import '@fontsource/noto-sans-jp/latin-700.css';
 
 @import '@fontsource/jetbrains-mono/400.css';
-@import '@fontsource/jetbrains-mono/500.css';
 @import '@fontsource/jetbrains-mono/700.css';
 
 @source '../../resources/js/**/*.tsx';

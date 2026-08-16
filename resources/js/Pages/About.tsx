@@ -93,7 +93,9 @@ export default function About({ name, title, location, github, avatar, skills, b
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <h3 className="text-xs font-mono text-text-muted mb-1">{label}</h3>
+      {/* h1(氏名)の直下のセクション見出しとしてh2にする（本文bodyHtmlの見出しも##=h2のため、
+          h1→h2→h2...の階層で揃う）。見た目は変えず、意味的な階層のみ正す */}
+      <h2 className="text-xs font-mono text-text-muted mb-1">{label}</h2>
       <div className="text-sm">{children}</div>
     </div>
   );
