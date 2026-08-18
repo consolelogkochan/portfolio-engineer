@@ -51,9 +51,17 @@ return Application::configure(basePath: dirname(__DIR__))
             // ステータス別の出し分けはしない（config('page_meta.pages.error')の固定文言を使う）。
             // 初回HTML（Blade出力）は固定タイトルだが、JS実行後はReact側のSTATUS_CONTENTにより
             // ステータス別タイトルへ切り替わる（Inertiaがdata-inertia無しのtitleを削除するため。意図した挙動）。
-            $meta = app(PageMetaBuilder::class)->build('error');
+            $pageMetaBuilder = app(PageMetaBuilder::class);
+            $meta = $pageMetaBuilder->build('error');
 
-            return Inertia::render('ErrorPage', ['status' => $statusCode])
+            // titleSuffix：JS実行後、React側（ErrorPage.tsx）がSTATUS_CONTENTのtitleと結合し
+            // 「ページが見つかりません — Kotaro」のようにサイト名サフィックス付きにするために渡す。
+            // 区切り文字・サイト名の定義はconfig('page_meta.site_name')の1箇所のまま
+            // （結合処理だけがBlade側とReact側の2箇所に存在する）。
+            return Inertia::render('ErrorPage', [
+                'status' => $statusCode,
+                'titleSuffix' => $pageMetaBuilder->titleSuffix(),
+            ])
                 ->withViewData(['pageMeta' => $meta])
                 ->toResponse($request)
                 ->setStatusCode($statusCode);

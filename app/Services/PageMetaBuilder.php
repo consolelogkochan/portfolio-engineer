@@ -60,7 +60,17 @@ class PageMetaBuilder
     {
         $siteName = (string) config('page_meta.site_name');
 
-        return $title ? "{$title} — {$siteName}" : $siteName;
+        return $title ? $title.$this->titleSuffix() : $siteName;
+    }
+
+    /**
+     * サイト名サフィックス（区切り文字＋サイト名）。
+     * ErrorPage.tsx がJS実行後にReact側（STATUS_CONTENT）のtitleと結合するために公開する
+     * （7-2後半）。区切り文字をTS側で新たに定義させないため、ここで組み立てた文字列をそのまま渡す。
+     */
+    public function titleSuffix(): string
+    {
+        return ' — '.(string) config('page_meta.site_name');
     }
 
     /** 相対パスをconfig('app.url')基点の絶対URLにする。既に絶対URL（http(s)://〜）ならそのまま返す */

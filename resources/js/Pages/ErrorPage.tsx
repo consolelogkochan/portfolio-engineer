@@ -5,7 +5,9 @@
 import PageMeta from '@/Components/PageMeta';
 import { Link } from '@inertiajs/react';
 
-type Props = { status: number };
+// titleSuffixはbootstrap/app.phpがPageMetaBuilder::titleSuffix()で組み立てて渡す
+// （区切り文字・サイト名の定義はconfig('page_meta.site_name')の1箇所のまま。ここでは結合するだけ）
+type Props = { status: number; titleSuffix: string };
 
 type StatusContent = { exceptionName: string; comment: string; title: string; description: string };
 
@@ -45,12 +47,12 @@ const FALLBACK_CONTENT: StatusContent = {
   description: '予期しないエラーが発生しました。しばらくしてから再度お試しください。',
 };
 
-export default function ErrorPage({ status }: Props) {
+export default function ErrorPage({ status, titleSuffix }: Props) {
   const { exceptionName, comment, title } = STATUS_CONTENT[status] ?? FALLBACK_CONTENT;
 
   return (
     <div className="flex flex-col items-center text-center py-24 md:py-32 lg:py-40 font-mono">
-      <PageMeta title={title} />
+      <PageMeta title={`${title}${titleSuffix}`} />
       {/* 数字：ページの主役。見せ場なのでlgまで段階調整する（app.cssのlg基準を参照） */}
       <p className="text-7xl md:text-8xl lg:text-9xl font-bold text-primary mb-8">{status}</p>
 

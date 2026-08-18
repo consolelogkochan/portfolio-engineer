@@ -19,6 +19,10 @@
     </source>
     <php>
         <env name="APP_ENV" value="testing"/>
+        <!-- og:urlの検証（tests/Feature/PageMetaTest.php）がconfig('app.url')基点の絶対URLを
+             組み立てるため、CI環境の.env/環境変数に依存せずテスト結果を再現可能にするためここで固定する。
+             値自体はconfig/app.php・.env.exampleのデフォルトと同じhttp://localhostを踏襲。 -->
+        <env name="APP_URL" value="http://localhost"/>
         <env name="APP_MAINTENANCE_DRIVER" value="file"/>
         <env name="BCRYPT_ROUNDS" value="4"/>
         <env name="BROADCAST_CONNECTION" value="null"/>

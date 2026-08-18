@@ -25,6 +25,13 @@ jobs:
 
       - run: composer install --prefer-dist --no-progress
 
+      # php artisan test（Laravelのテスト実行）にはAPP_KEYが必須（未設定だとMissingAppKeyExceptionで
+      # 全ページが落ちることを実測で確認済み）。.envはリポジトリに含まれないため、CIでは
+      # .env.exampleをコピーしてartisan key:generateで都度発行する。
+      - run: cp .env.example .env
+
+      - run: php artisan key:generate
+
       - run: npm ci
 
       - run: npx tsc --noEmit
@@ -38,5 +45,12 @@ jobs:
       - run: composer audit
 
       - run: npm run build
+
+      # php artisan testはnpm run buildの後に置く：resources/views/app.blade.phpの@vite()が
+      # public/build/manifest.jsonを要求するため、ビルド前に実行すると全ページが
+      # 「Vite manifest not found」で確実に失敗することを実測で確認した
+      # （依頼上は pint --test の後・composer audit の前が指定されていたが、
+      #   ビルド成果物が無いと物理的に実行不可能なためこの位置に変更）。
+      - run: php artisan test
 
       - run: npx tsx scripts/validate-content.ts

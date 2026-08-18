@@ -31,6 +31,15 @@ return [
     | title => null は「サフィックスを付けずサイト名のみを表示する」という意図的な指定。
     | works.show / logs.show のようにdescriptionが常にfrontmatter由来の動的値になる
     | ページは、ここに固定文言を持たない（Controller側でoverridesとして渡す）。
+    |
+    | 【注意：ドット記法の罠】キーには 'works.index' のようにドットを含むものがある。
+    | config('page_meta.pages.works.index') のようにドット記法で個別キーを直接引いては
+    | ならない。Laravelがpages→works→indexと階層探索してしまい、'works.index'という
+    | 単一キーとは一致しない（意図せずnull/空にフォールバックする。前半の実装中に実際に
+    | 発生し修正済み）。必ずconfig('page_meta.pages')でpages配列をまるごと取得してから、
+    | 通常の配列アクセス（$pages['works.index']）でリテラルなキーとして引くこと。
+    | このconfigの読み出しはapp/Services/PageMetaBuilder.phpに集約されており、
+    | 他の場所（Controller等）から直接configを引かない設計になっている。
     */
     'pages' => [
         'home' => [
