@@ -43,7 +43,15 @@ return Application::configure(basePath: dirname(__DIR__))
         $exceptions->respond(function (Response $response, Throwable $e, Request $request) {
             $statusCode = $response->getStatusCode();
 
-            // 開発・テスト環境ではLaravelの詳細デバッグ画面を優先する（カスタムErrorPageは本番相当のみ）。
+            // local / testing 環境ではカスタム ErrorPage を表示せず、
+            // Laravel 標準の例外ハンドリングに委ねる。
+            // テスト時に例外の詳細（スタックトレース等）を確認できるようにするため。
+            //
+            // この結果、testing 環境では ErrorPage が render されないため、
+            // ErrorPage の meta を feature test で検証できない（7-2で実測確認済み）。
+            // テスト可能にするために testing を除外対象から外すことは、上記の理由により行わない。
+            // ErrorPage の meta は固定文言であり変更頻度がほぼゼロのため、
+            // 検証の網から外すコストは小さいと判断した。
             if (app()->environment(['local', 'testing']) || ! in_array($statusCode, [403, 404, 500, 503], true)) {
                 return $response;
             }
