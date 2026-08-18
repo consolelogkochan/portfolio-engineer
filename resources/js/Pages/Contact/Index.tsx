@@ -13,12 +13,13 @@ type ServerErrors = Partial<Record<keyof ContactInput, string>>;
 
 type Props = {
   form_token: string;
+  pageTitle: string;
 };
 
 const inputClasses =
   'w-full bg-surface border border-border rounded-md px-3 py-2 text-text placeholder:text-text-muted focus:border-primary focus:outline-none transition-colors';
 
-export default function Index({ form_token }: Props) {
+export default function Index({ form_token, pageTitle }: Props) {
   const { props } = usePage<{
     flash: { success?: string; rate_limited?: string };
     errors: ServerErrors;
@@ -68,7 +69,7 @@ export default function Index({ form_token }: Props) {
 
   return (
     <div className="max-w-xl mx-auto">
-      <PageMeta title="Contact" description="お問い合わせはこちら" />
+      <PageMeta title={pageTitle} />
 
       <h1 className="text-2xl font-bold mb-6">お問い合わせ</h1>
 

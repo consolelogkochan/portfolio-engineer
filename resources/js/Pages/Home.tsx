@@ -9,13 +9,13 @@ import { Link } from '@inertiajs/react';
 
 type Props = {
   featuredWorks: WorkSummary[];
+  pageTitle: string;
 };
 
-export default function Home({ featuredWorks }: Props) {
+export default function Home({ featuredWorks, pageTitle }: Props) {
   return (
     <div>
-      {/* トップはtitle未指定＝「portfolio-engineer」単体（app.tsxのcallback参照） */}
-      <PageMeta description="AIと協働し、判断を重ねるエンジニアのポートフォリオ" />
+      <PageMeta title={pageTitle} />
 
       <section className="text-center py-12 md:py-20 lg:py-24">
         <p className="font-mono text-base md:text-lg lg:text-xl text-text-muted mb-6">

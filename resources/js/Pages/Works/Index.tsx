@@ -4,12 +4,13 @@ import { WorkSummary } from '@/types/work';
 
 type Props = {
   works: WorkSummary[];
+  pageTitle: string;
 };
 
-export default function Index({ works }: Props) {
+export default function Index({ works, pageTitle }: Props) {
   return (
     <div>
-      <PageMeta title="Works" description="制作した作品の一覧です。" />
+      <PageMeta title={pageTitle} />
 
       <h1 className="text-2xl font-bold mb-2">Works</h1>
       <p className="text-text-muted text-sm mb-6">{works.length} 件</p>

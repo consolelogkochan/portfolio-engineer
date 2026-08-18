@@ -9,6 +9,7 @@ use App\Exceptions\ContentNotPublishedException;
 use App\Exceptions\ContentParseException;
 use App\Services\ContentRepository;
 use App\Services\MarkdownRenderer;
+use App\Services\PageMetaBuilder;
 use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -18,6 +19,7 @@ class LogController extends Controller
     public function __construct(
         private readonly ContentRepository $repository,
         private readonly MarkdownRenderer $renderer,
+        private readonly PageMetaBuilder $pageMeta,
     ) {}
 
     public function show(string $slug): Response
@@ -39,8 +41,8 @@ class LogController extends Controller
 
         $hasRelatedWork = $this->repository->hasPublishedWork($slug);
 
-        // OGP画像：対応作品（同slug）があればそのthumbnailを使う。無ければnullを返し、
-        // フロント（PageMeta）側のデフォルトプレースホルダに委ねる（パスの二重管理を避ける）。
+        // OGP画像：対応作品（同slug）があればそのthumbnailを使う。無ければnullのまま、
+        // PageMetaBuilder側のデフォルトOGP画像（config('page_meta.default_og_image')）に委ねる。
         $ogImage = null;
         if ($hasRelatedWork) {
             try {
@@ -50,6 +52,13 @@ class LogController extends Controller
                 // hasPublishedWorkの直後でも稀に競合しうる。失敗時はプレースホルダにフォールバック
             }
         }
+
+        $meta = $this->pageMeta->build('logs.show', [
+            'title' => $result['frontmatter']['title'] ?? null,
+            'description' => $result['frontmatter']['summary'] ?? '',
+            'ogImage' => $ogImage,
+            'ogType' => 'article',
+        ]);
 
         // bodyHtml を dangerouslySetInnerHTML で出力することを許容する根拠：
         // - ソースは content/logs/*.md（Gitリポジトリ内・著者管理）であり、
@@ -61,7 +70,7 @@ class LogController extends Controller
             'slug' => $slug,
             'bodyHtml' => $this->renderer->toHtml($result['body']),
             'hasRelatedWork' => $hasRelatedWork,
-            'ogImage' => $ogImage,
-        ]);
+            'pageTitle' => $meta['title'],
+        ])->withViewData(['pageMeta' => $meta]);
     }
 }

@@ -1,50 +1,18 @@
-// 各ページ共通のdescription/OGP/Twitter Cardタグ。構造はここに集約し、
-// ページごとの差分（title/description/image/type）だけを渡す（5-4/5-10と同じ「構造共通・中身固有」）。
+// <title>要素のみを、サーバー側（PHP: app/Services/PageMetaBuilder.php）で組み立て済みの
+// 完成形文字列でそのまま出力する（サイト名サフィックス付与済み。加工しない）。
 //
-// <title>要素自体はここで文字列を組まず、生のtitleをそのまま<Head title>に渡す。
-// サフィックス付与はapp.tsxのcreateInertiaApp({ title })に一元化されているため、
-// og:title等ではpageTitle()で同じ文字列を再現するだけで、二重にサフィックスを付けない。
-//
-// og:url・og:imageは絶対URLが必須。SSR無し（window不可の環境がありうる）のため、
-// window.location.origin ではなくサーバー共有のapp_url（config('app.url')）を単一の情報源にする。
-import { pageTitle } from '@/lib/siteMeta';
-import { Head, usePage } from '@inertiajs/react';
-
-const DEFAULT_OG_IMAGE = '/images/og/default.png';
+// og:*/twitter:*/descriptionはここでは出力しない（7-2）。理由：
+// resources/views/app.blade.php がBladeから直接サーバーサイド出力するようになったため。
+// React側で同名タグを重ねて出すと、Blade由来のタグはdata-inertia属性を持たずInertiaの
+// Renderer.update管理対象外となる一方、React由来のタグは別途data-inertia付きで追加されるため、
+// DOM上でmeta要素が重複して残ってしまう（実測で確認済み）。<title>だけはInertia core側に
+// 「data-inertia無しのtitleを強制削除する」特別処理があるため、両方に書いても重複しない。
+import { Head } from '@inertiajs/react';
 
 type Props = {
-  title?: string;
-  description: string;
-  ogImage?: string;
-  ogType?: 'website' | 'article';
+  title: string;
 };
 
-export default function PageMeta({
-  title,
-  description,
-  ogImage = DEFAULT_OG_IMAGE,
-  ogType = 'website',
-}: Props) {
-  const { props, url } = usePage<{ app_url: string }>();
-  const origin = props.app_url.replace(/\/$/, '');
-  const fullTitle = pageTitle(title);
-  const absoluteImage = ogImage.startsWith('http') ? ogImage : `${origin}${ogImage}`;
-  const absoluteUrl = `${origin}${url}`;
-
-  return (
-    <Head title={title}>
-      <meta name="description" content={description} />
-
-      <meta property="og:title" content={fullTitle} />
-      <meta property="og:description" content={description} />
-      <meta property="og:type" content={ogType} />
-      <meta property="og:url" content={absoluteUrl} />
-      <meta property="og:image" content={absoluteImage} />
-
-      <meta name="twitter:card" content="summary_large_image" />
-      <meta name="twitter:title" content={fullTitle} />
-      <meta name="twitter:description" content={description} />
-      <meta name="twitter:image" content={absoluteImage} />
-    </Head>
-  );
+export default function PageMeta({ title }: Props) {
+  return <Head title={title} />;
 }

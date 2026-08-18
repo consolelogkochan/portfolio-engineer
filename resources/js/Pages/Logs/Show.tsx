@@ -4,29 +4,24 @@ import { Log } from '@/types/log';
 import { Link } from '@inertiajs/react';
 
 // slugはLogSchemaの一部ではなく、Controllerがルートパラメータから渡すもの
-// ogImageはLogControllerが対応作品の有無を解決した結果（無ければnull＝PageMetaのプレースホルダに委ねる）
+// pageTitleはLogController::showがPageMetaBuilderで組み立てた完成形タイトル
+// （ogImageの解決もPageMetaBuilder側に一本化されたため、ここでは受け取らない）
 type Props = Log & {
   slug: string;
   bodyHtml: string;
   hasRelatedWork: boolean;
-  ogImage: string | null;
+  pageTitle: string;
 };
 
 export default function Show(props: Props) {
-  const { title, publishedAt, updatedAt, tags, slug, hasRelatedWork, bodyHtml, ogImage, summary } =
-    props;
+  const { title, publishedAt, updatedAt, tags, slug, hasRelatedWork, bodyHtml, pageTitle } = props;
 
   return (
     // mainのmax-w-4xlより一段狭いmax-w-3xlに委ねる（5-15 Aboutと同じ解）。
     // max-w-proseのままだと大画面で本文だけ狭まりmx-auto無しで左寄る＝右に不自然な余白ができるため、
     // ページ全体（見出し・タグ・本文）を同じ幅に揃える。
     <div className="max-w-3xl mx-auto">
-      <PageMeta
-        title={title}
-        description={summary}
-        ogImage={ogImage ?? undefined}
-        ogType="article"
-      />
+      <PageMeta title={pageTitle} />
 
       {hasRelatedWork && (
         <Link

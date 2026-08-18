@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Middleware\HandleInertiaRequests;
+use App\Services\PageMetaBuilder;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -47,12 +48,13 @@ return Application::configure(basePath: dirname(__DIR__))
                 return $response;
             }
 
-            // 404等はルーティング解決前後、HandleInertiaRequestsミドルウェアを経由しないまま
-            // 例外ハンドラに到達することがあるため、BaseLayoutが参照しうる共有データ（app_url）を
-            // ここで明示的に補っておく（ミドルウェア外で発生するケースへの対応）。
-            Inertia::share('app_url', config('app.url'));
+            // ステータス別の出し分けはしない（config('page_meta.pages.error')の固定文言を使う）。
+            // 初回HTML（Blade出力）は固定タイトルだが、JS実行後はReact側のSTATUS_CONTENTにより
+            // ステータス別タイトルへ切り替わる（Inertiaがdata-inertia無しのtitleを削除するため。意図した挙動）。
+            $meta = app(PageMetaBuilder::class)->build('error');
 
             return Inertia::render('ErrorPage', ['status' => $statusCode])
+                ->withViewData(['pageMeta' => $meta])
                 ->toResponse($request)
                 ->setStatusCode($statusCode);
         });

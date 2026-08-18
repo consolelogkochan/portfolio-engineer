@@ -1,14 +1,14 @@
 import '../css/app.css';
 import BaseLayout from './Layouts/BaseLayout';
-import { pageTitle } from './lib/siteMeta';
 import { createInertiaApp, type ResolvedComponent } from '@inertiajs/react';
 import { createRoot } from 'react-dom/client';
 import { type ReactNode } from 'react';
 
 createInertiaApp({
-  // 各ページは <Head title="About"> のように生のページ名だけ渡し、
-  // サイト名サフィックスの付与はここに一元化する（二重管理を避ける）。
-  title: (title) => pageTitle(title),
+  // titleオプションは指定しない：サイト名サフィックス付きの完成形タイトルは
+  // サーバー側（PHP: app/Services/PageMetaBuilder.php）で組み立て済みのものを
+  // pageTitle propとして受け取り、各ページがPageMeta（<Head title>）にそのまま渡す（7-2）。
+  // 省略時、Inertia coreはtitleをそのまま使う（titleCallback未指定時のデフォルト＝恒等関数）。
   resolve: (name) => {
     const pages = import.meta.glob<{ default: ResolvedComponent }>('./Pages/**/*.tsx', {
       eager: true,

@@ -13,15 +13,26 @@ type Props = {
   avatar: string;
   skills: { backend: string[]; frontend: string[] };
   bodyHtml: string;
+  pageTitle: string;
 };
 
-export default function About({ name, title, location, github, avatar, skills, bodyHtml }: Props) {
+export default function About({
+  name,
+  title,
+  location,
+  github,
+  avatar,
+  skills,
+  bodyHtml,
+  pageTitle,
+}: Props) {
   return (
     // mainのmax-w-4xlより一段狭いmax-w-3xlで全体を包む（中間案）。
     // グリッドと本文を同じラッパーで揃えることで、幅は絞りつつ「2カラムと本文の幅は揃える」を維持する
     <div className="max-w-3xl mx-auto">
-      {/* description=肩書き（titleフィールド）。ogImageは指定せず共通OGP画像（PageMetaのDEFAULT_OG_IMAGE）に委ねる */}
-      <PageMeta title="About" description={title} />
+      {/* pageTitleはAboutControllerがPageMetaBuilderで組み立てた完成形タイトル
+          （description=肩書き（titleフィールド）はAboutController側でoverridesとして渡している） */}
+      <PageMeta title={pageTitle} />
 
       <div className="grid grid-cols-1 md:grid-cols-[auto_1fr] gap-8 mb-12">
         {/* 画像の背景が明るいため、border でダークなサイト背景との境界を明確にする */}

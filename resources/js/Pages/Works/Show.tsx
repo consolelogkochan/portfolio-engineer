@@ -8,7 +8,8 @@ import { Link } from '@inertiajs/react';
 import React from 'react';
 
 // slugはWorkSchemaの一部ではなく、Controllerがルートパラメータから渡すもの
-type Props = Work & { slug: string; bodyHtml: string; hasRelatedLog: boolean };
+// pageTitleはWorkController::showがPageMetaBuilderで組み立てた完成形タイトル
+type Props = Work & { slug: string; bodyHtml: string; hasRelatedLog: boolean; pageTitle: string };
 
 export default function Show(props: Props) {
   const {
@@ -27,12 +28,12 @@ export default function Show(props: Props) {
     slug,
     hasRelatedLog,
     bodyHtml,
-    thumbnail,
+    pageTitle,
   } = props;
 
   return (
     <div>
-      <PageMeta title={title} description={summary} ogImage={thumbnail} ogType="article" />
+      <PageMeta title={pageTitle} />
 
       <h1 className="text-xl md:text-2xl font-bold mb-1">{title}</h1>
       <p className="text-text-muted text-sm mb-8">

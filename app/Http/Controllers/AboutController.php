@@ -8,6 +8,7 @@ use App\Exceptions\ContentNotFoundException;
 use App\Exceptions\ContentParseException;
 use App\Services\ContentRepository;
 use App\Services\MarkdownRenderer;
+use App\Services\PageMetaBuilder;
 use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -17,6 +18,7 @@ class AboutController extends Controller
     public function __construct(
         private readonly ContentRepository $repository,
         private readonly MarkdownRenderer $renderer,
+        private readonly PageMetaBuilder $pageMeta,
     ) {}
 
     public function __invoke(): Response
@@ -38,9 +40,15 @@ class AboutController extends Controller
         // - MarkdownRenderer は html_input=allow だが、
         //   MarkdownRenderer クラスのdocコメントで「著者管理コンテンツ専用」と明記済み。
         // - allow_unsafe_links=false により javascript: スキームのリンクは除去される。
+        $meta = $this->pageMeta->build('about', [
+            // description=肩書き（titleフィールド）。ogImageは指定せず共通OGP画像に委ねる
+            'description' => $result['frontmatter']['title'] ?? '',
+        ]);
+
         return Inertia::render('About', [
             ...$result['frontmatter'],
             'bodyHtml' => $this->renderer->toHtml($result['body']),
-        ]);
+            'pageTitle' => $meta['title'],
+        ])->withViewData(['pageMeta' => $meta]);
     }
 }

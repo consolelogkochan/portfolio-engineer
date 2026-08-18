@@ -6,6 +6,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\ContactRequest;
 use App\Mail\ContactMail;
+use App\Services\PageMetaBuilder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Log;
@@ -15,13 +16,18 @@ use Inertia\Response;
 
 class ContactController extends Controller
 {
+    public function __construct(private readonly PageMetaBuilder $pageMeta) {}
+
     public function create(): Response
     {
+        $meta = $this->pageMeta->build('contact');
+
         return Inertia::render('Contact/Index', [
             // 時間トラップ用：表示時刻を暗号化してクライアントに渡す。
             // 送信時に復号し、経過秒数を検証する（ContactRequest::detectSpam）。
             'form_token' => Crypt::encryptString((string) time()),
-        ]);
+            'pageTitle' => $meta['title'],
+        ])->withViewData(['pageMeta' => $meta]);
     }
 
     public function store(ContactRequest $request): RedirectResponse
