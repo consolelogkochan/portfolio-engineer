@@ -1,4 +1,4 @@
-# サーバー構築手順書（7-3a：ConoHa VPS契約とサーバーの安全化）
+# サーバー構築手順書
 
 この文書は、本番サーバーを構築した際の手順を再現可能な形で記録したものです。
 サーバーを作り直す必要が生じたとき、上から順に実行すれば同じ状態に到達できることを目標としています。
@@ -19,7 +19,7 @@
 - ConoHa VPS 3.0 / 2GB / 東京リージョン / Ubuntu 26.04 LTS
 - 料金プラン：まとめトク6ヶ月
   - 理由：クレジットカードの更新時期を契約期間の内側に抱え込み、更新イベントの回数を減らすため
-  - 注意：入金が確認できず契約満了を迎えるとサーバーが削除される（詳細は12節）
+  - 注意：入金が確認できず契約満了を迎えるとサーバーが削除される（詳細は16節）
 
 ### オプションの選択と理由
 
@@ -404,19 +404,304 @@ sudo ufw status verbose
 
 `~/.ssh/config` に `Host` エントリを追加し、`chmod 600` する。以降は `ssh <ホスト別名>` だけで接続できる。
 
+### SSH接続の維持（ServerAliveInterval）
+
+SSH接続が無操作で切断される問題への対処として、`~/.ssh/config` に以下を追加した。
+
+```
+ServerAliveInterval 60
+ServerAliveCountMax 3
+```
+
+**理由**：作業中に切断されると、設定変更時に「既存の接続を命綱として保つ」手順が成立しなくなるため。60秒ごとに信号を送って接続を維持する。
+
 ---
 
-## 12. 運用上の注意（恒久的に発生すること）
+## 12. Nginx のインストール
+
+**目的**：Webサーバーを導入し、外部からHTTP経由で疎通できる状態を作る。
+
+```bash
+sudo apt update
+sudo apt install -y nginx
+systemctl status nginx --no-pager
+systemctl is-enabled nginx
+```
+
+**期待する出力**：
+
+- `Active: active (running)`
+- `is-enabled` が `enabled`
+
+### 判断の理由
+
+- `is-enabled` の確認が重要な理由：自動セキュリティ更新（9節）で深夜に再起動する設定にしているため、自動起動が無効だと再起動後にサイトが落ちたままになる
+
+### ufw への80番の追加
+
+ConoHaのセキュリティグループは `IPv4v6-Web` で既に許可済みのため、この作業はufw側のみである。
+
+```bash
+sudo ufw allow 80/tcp
+sudo ufw status verbose
+```
+
+**期待する出力**：`80/tcp` がIPv4とIPv6の両方に `ALLOW IN` として表示され、`22/tcp` は `LIMIT` のままであること。
+
+### 検証
+
+ブラウザで `http://<SERVER_IP>` を開き、"Welcome to nginx!" が表示されることを確認する。
+
+この表示は、ConoHaセキュリティグループ → ufw → Nginx の3層がすべて通って初めて成立する。
+
+---
+
+## 13. PHP 8.5 と PHP-FPM のインストール
+
+### 必要な拡張の特定（推測せず composer.json から逆算する）
+
+composer.json に `ext-*` の明示的な記載はないため、パッケージから逆算した。
+
+- `intervention/image` → GD または Imagick
+- `league/commonmark` → mbstring
+- `laravel/framework` → ctype / curl / dom / fileinfo / filter / hash / mbstring / openssl / pcre / pdo / session / tokenizer / xml
+- `spatie/laravel-image-optimizer` → 外部のCLIツール（後述の判断2を参照）
+
+### 判断1：Imagick ではなくGDを使う
+
+`intervention/image` はどちらでも動くが、ImageMagickは依存が重く、過去に脆弱性の報告が多い。このサイトが必要とする処理にはGDで足りる。
+
+### 判断2：画像最適化の外部ツール（jpegoptim / pngquant 等）は入れない
+
+`spatie/laravel-image-optimizer` は、PHPの拡張ではなくサーバーにインストールされたコマンドを呼び出して動く。
+
+しかし `OptimizeImages` コマンドは開発環境のプレコミットで実行され、生成されたwebpファイルはgitにコミットされ、デプロイ時点で揃っている。サーバーの役割は「置く」と「返す」であって「作る」ではない。
+
+副次的な利益として、インストールするソフトウェアが減れば攻撃面が減り、更新対象も減る。
+
+※ パッケージ自体は `composer install` で本番にも入るが、実行しないため害はない。
+
+### 判断3：`php8.5-intl` は入れない
+
+composer.json から要求されておらず、必要になれば後から追加できる。推測で先回りすると、後から棚卸ししたときに「なぜ入っているか」が説明できなくなる。必要ならインストール時か実行時に明確なエラーが出る。
+
+### パッケージ名の確認（推測せず実測する）
+
+```bash
+apt-cache search "^php8\.5-" | sort
+```
+
+存在しないパッケージ名を含めて `apt install` すると、コマンド全体が失敗するため、事前に名前を確認する。
+
+### インストール
+
+```bash
+sudo apt install -y php8.5-fpm php8.5-cli php8.5-mbstring \
+     php8.5-xml php8.5-curl php8.5-gd php8.5-zip
+```
+
+**注意**：`libapache2-mod-php8.5` は入れない。また `php` というメタパッケージを指定するとApacheが一緒に入ることがあるため、必ずバージョンと役割を明示したパッケージ名を使う。
+
+### 確認
+
+```bash
+php -v
+php -m
+systemctl status php8.5-fpm --no-pager
+systemctl is-enabled php8.5-fpm
+```
+
+**期待する出力**：
+
+- PHP 8.5.x
+- gd / mbstring / curl / dom / SimpleXML / zip が含まれる
+- FPMが `active (running)` かつ `enabled`
+
+**注意**：`php -v` と `php -m` はCLI側の情報である。PHPはCLIとFPMで別々の設定を持つため、FPM側の状態はphpinfo()をブラウザから確認する必要がある（OPcacheはCLIでは既定で無効）。
+
+---
+
+## 14. Nginx と PHP-FPM の連携
+
+### 前提の確認
+
+```bash
+ls -la /etc/nginx/snippets/     # fastcgi-php.conf が存在すること
+ls -la /run/php/                # php-fpm.sock が存在すること
+```
+
+`fastcgi-php.conf` は、NginxがPHP-FPMにリクエストを渡すときの共通設定をまとめたもの。自分で書くと漏れが出るため、ディストリビューションが用意したものを使う。
+
+### ソケットの構造と注意点
+
+```
+php-fpm.sock -> /etc/alternatives/php-fpm.sock -> php8.5-fpm.sock
+```
+
+`php-fpm.sock` はalternatives機構を経由したシンボリックリンクである。
+
+- `/run/php/php-fpm.sock` を設定に書く：PHPをアップグレードしても設定変更が不要。ただしどのバージョンに繋がっているかが間接的になる
+- `/run/php/php8.5-fpm.sock` を書く：明示的だが、バージョンを上げると設定も変える必要がある
+
+前者を採用した。ただしPHPをアップグレードする際は、この参照先が意図したバージョンを指しているか必ず確認すること。
+
+なお実体のソケットは `srw-rw---- www-data:www-data` であり、www-data以外は読み書きできない。これも内部の防御層の一つになっている。
+
+### 通信方法の判断：Unixソケット（TCPではなく）
+
+- 同一マシン内の通信なので速い（TCPのオーバーヘッドがない）
+- 外部から到達できない。ファイルシステム上の存在であり、ネットワーク越しには触れない。TCPだとローカルポートが開く
+- 既定に従う（PHP-FPMの初期設定がUnixソケット）
+
+TCPが必要になるのはPHP-FPMを別サーバーに分離する場合だが、その予定はない。
+
+### 【落とし穴】既定のサイト設定ファイルの構造
+
+`/etc/nginx/sites-available/default` は、先頭にコメントアウトされた設定例が置かれており、有効な `server` ブロックはその下にある。
+
+エディタで開いて最初の1画面だけを見ると「全体がコメントアウトされている」と誤認する。
+
+有効な行だけを確認するには次を使う：
+
+```bash
+grep -vE '^\s*(#|$)' /etc/nginx/sites-available/default
+```
+
+構成全体の把握には次を使う：
+
+```bash
+ls -la /etc/nginx/sites-enabled/
+ls -la /etc/nginx/conf.d/
+grep -nE "include|server \{|root|listen" /etc/nginx/nginx.conf
+```
+
+「見た範囲」と「全体」は別物である。
+
+### 設定の追加
+
+バックアップを取ってから、ファイルを書き換える。
+
+```bash
+sudo cp /etc/nginx/sites-available/default \
+        /etc/nginx/sites-available/default.bak
+
+sudo tee /etc/nginx/sites-available/default > /dev/null <<'EOF'
+server {
+    listen 80 default_server;
+    listen [::]:80 default_server;
+
+    root /var/www/html;
+    index index.php index.html index.htm index.nginx-debian.html;
+
+    server_name _;
+
+    location / {
+        try_files $uri $uri/ =404;
+    }
+
+    # .php で終わるリクエストを PHP-FPM に渡す
+    location ~ \.php$ {
+        include snippets/fastcgi-php.conf;
+        fastcgi_pass unix:/run/php/php-fpm.sock;
+    }
+}
+EOF
+```
+
+`index` に `index.php` を先頭で追加している。これがないと、ディレクトリにアクセスしたときにPHPファイルが選ばれない。
+
+※ この設定は連携確認のための暫定である。アプリ用の `server` ブロックは、配置場所が決まる7-3cで作成し、そのときこの `default` は無効化する。
+
+### 検証
+
+```bash
+sudo nginx -t
+sudo systemctl reload nginx
+```
+
+`nginx -t` が `syntax is ok` と `test is successful` を返すことを確認してから `reload` する。エラーが出たら `reload` しない。
+
+ブラウザ確認用に一時ファイルを置く。
+
+```bash
+echo '<?php phpinfo();' | sudo tee /var/www/html/info.php > /dev/null
+```
+
+`http://<SERVER_IP>/info.php` を開き、以下を確認する。
+
+- PHP Version が 8.5.x であること
+- Server API が `FPM/FastCGI` であること（CLIではないこと）→ これがNginxとPHP-FPMが連携している証拠
+- Zend OPcacheのセクションが存在し、Opcode Cachingが `Up and Running`
+- gd / mbstring / curl / dom / zip の各セクションが存在する
+
+【重要】phpinfo() はサーバーの構成情報をすべて公開する。PHPのバージョン、拡張、ファイルパス、環境変数が誰にでも見える。確認後は必ず削除すること。
+
+```bash
+sudo rm /var/www/html/info.php
+```
+
+削除後、ブラウザで404になることを確認する。「消したつもり」ではなく「消えたことを外から確認する」。
+
+---
+
+## 15. 実行ユーザーとファイル所有権の設計
+
+※ 実際の適用は7-3c（アプリ配置時）に行う。ここでは設計の記録のみ。
+
+### プロセスの実行権限
+
+| プロセス | 権限 |
+|---|---|
+| Nginx master | root（80番ポートを開くために必要） |
+| Nginx worker | www-data |
+| PHP-FPM master | root |
+| PHP-FPM pool www | www-data |
+
+Webサーバーは外部からの入力を受け取る最前線である。脆弱性を突かれたとき、rootで動いていればその瞬間にサーバー全体を掌握される。権限を限定したユーザーで動かせば、被害はその権限の範囲に留まる。
+
+### ファイルの所有権（7-3cで適用する設計）
+
+- 所有者：`<USER>`（デプロイする人）
+- グループ：www-data
+- `storage/` と `bootstrap/cache/` のみグループ書き込みを許可
+- それ以外のコードはwww-dataから読み取りのみ
+
+これにより、`<USER>` はgit pullでき、www-dataは必要な場所にだけ書ける。
+
+### PHP-FPMを`<USER>`権限で動かさない理由
+
+「`<USER>`権限で動かす」とは、そのプロセスに`<USER>`の権限を与えること。乗っ取られれば、攻撃者は`<USER>`の権限をそのまま手に入れる。
+
+- コードベース全体への書き込みが可能になる
+- `~/.ssh/authorized_keys` に自分の公開鍵を追加でき、以後SSHで入れる
+- `~/.bashrc` を書き換え、`sudo` を偽コマンドに差し替えてパスワードを盗める
+- sudoグループに所属しているため、パスワードが取れればroot
+
+最前線のプロセスには、できるだけ何も持たせないのが原則である。www-dataはログインシェルもホームディレクトリの実体も持たない。
+
+### 残るリスクと7-3cでの対処
+
+`bootstrap/cache/config.php` はLaravelが起動時に読み込むPHPファイルである。ここに書き込めるということは、実質的に任意のコードを実行させられる。
+
+対処：デプロイ時に`<USER>`が `php artisan config:cache` を実行してキャッシュを生成し、www-dataには読み取り権限だけを与える。実行時にPHPが書き込む必要がなくなる。
+
+`storage/` は書き込みが必須なので残るが、ログとキャッシュのディレクトリであり、PHPとして実行されるファイルではない。
+
+---
+
+## 16. 運用上の注意（恒久的に発生すること）
 
 - 通常更新（`-updates`）は自動適用されない。月1回程度、手動で `apt update && apt upgrade` を実行する必要がある
 - ポートを開けるときはConoHaセキュリティグループとufwの2箇所を見る
 - まとめトクは契約満了の7日前に自動更新・自動決済される。入金が確認できないとサーバーが削除される。クレジットカードの有効期限を管理し、満了日をカレンダーに入れる
 - 監視は未設定。サーバーやサービスが停止しても検知されない
 - バックアップは未設定。サーバー設定はこの手順書にのみ存在するため、手順書と実物のずれがそのまま復元できない範囲になる
+- PHPをアップグレードする際は、Nginxの設定が参照している `/run/php/php-fpm.sock` の指す先が意図したバージョンかを確認すること
+- `php -v` / `php -m` はCLI側の情報である。FPM側の設定を確認するにはphpinfo()をブラウザから見る必要がある
 
 ---
 
-## 13. 未実施・保留
+## 17. 未実施・保留
 
 - ESM（Ubuntu Pro）：未有効。標準サポート期間中の追加価値が未確認のため保留
 - 監視：未設定。回収先は7-3dまたは7-10
