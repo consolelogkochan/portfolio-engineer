@@ -19,7 +19,7 @@
 - ConoHa VPS 3.0 / 2GB / 東京リージョン / Ubuntu 26.04 LTS
 - 料金プラン：まとめトク6ヶ月
   - 理由：クレジットカードの更新時期を契約期間の内側に抱え込み、更新イベントの回数を減らすため
-  - 注意：入金が確認できず契約満了を迎えるとサーバーが削除される（詳細は16節）
+  - 注意：入金が確認できず契約満了を迎えるとサーバーが削除される（詳細は17節）
 
 ### オプションの選択と理由
 
@@ -689,7 +689,193 @@ Webサーバーは外部からの入力を受け取る最前線である。脆�
 
 ---
 
-## 16. 運用上の注意（恒久的に発生すること）
+## 16. 本番向け PHP 設定の確認と調整
+
+### 現状の確認方法
+
+php.iniは2000行近くあり目で追えないため、有効な行だけを抽出する。
+
+```bash
+grep -vE '^\s*(;|$)' /etc/php/8.5/fpm/php.ini | grep -iE "display_errors|display_startup_errors|expose_php|memory_limit|max_execution_time|post_max_size|upload_max_filesize|disable_functions|open_basedir|error_reporting|log_errors"
+```
+
+### 確認結果：Ubuntuのfpm/php.iniは既に本番向けだった
+
+| 項目 | 値 | 評価 |
+|---|---|---|
+| display_errors | Off | エラー内容がブラウザに出ない |
+| display_startup_errors | Off | 同上 |
+| expose_php | Off | X-Powered-By でバージョンを公開しない |
+| log_errors | On | エラーはログに残る |
+| error_reporting | E_ALL & ~E_DEPRECATED | 妥当 |
+| memory_limit | 128M | 通常のWebリクエストには十分 |
+| max_execution_time | 30 | 妥当 |
+| post_max_size / upload_max_filesize | 8M / 2M | アップロード機能がないため十分 |
+| disable_functions | 空 | 未設定（後述の判断で設定する） |
+| open_basedir | 未設定 | 意図的に設定しない（後述） |
+
+「本番向けに変更が必要だろう」と想定していたが、実測すると既に適切だった。推測で作業を始めず、まず現状を見ることの実例。
+
+### OPcacheの状態
+
+OPcacheはPHP本体に静的に組み込まれており、共有拡張としてconf.dに登録されてはいない（推測を含む）。fpm/php.iniの`[opcache]`セクションは全行がコメントアウトされているため、すべてPHPの組み込み既定値が効いている。
+
+OPcacheが実際に稼働していることは、「Nginx と PHP-FPM の連携」の節でphpinfo()により確認済みである（Zend OPcacheのセクションが存在し、Opcode Cachingが`Up and Running`）。
+
+以後、稼働状況とキャッシュの使用量を確認するには、一時的なPHPファイルから次を出力する。
+
+```php
+<?php
+var_dump(opcache_get_status(false));
+```
+
+確認したい項目：
+
+- `opcache_enabled` が`true`であること
+- `num_cached_scripts`（キャッシュ済みのファイル数）
+- `max_cached_keys` / `opcache.max_accelerated_files`（上限）に達していないこと
+- `memory_usage`の`free_memory`が枯渇していないこと
+
+phpinfo() ではなく必要な項目だけを出すこと。確認後は必ずファイルを削除し、404になることを確かめること。
+
+判断：`opcache.validate_timestamps` は既定の`1`のままとする。
+
+- `0` にするとPHPファイルの更新確認がなくなり速くなるが、デプロイのたびにPHP-FPMのreloadが必須になる
+- 忘れると「デプロイしたのに反映されない」という原因の分かりにくい事象が起きる
+- このサイトのトラフィックでは、更新確認のコストは無視できる
+- デプロイを自動化してreloadを手順に組み込めば「忘れる」経路が消えるため、その時点で`0`を再検討する
+
+未実測の項目：`opcache.max_accelerated_files` の既定は10000だが、Laravelはvendorを含めるとファイル数が多く、超える可能性がある。アプリ配置後に`opcache_get_status()`で実測すること。
+
+### PHP-FPMのプロセス設定（現状のみ。調整は実測後）
+
+```bash
+grep -vE '^\s*(;|$)' /etc/php/8.5/fpm/pool.d/www.conf
+ps -o pid,rss,cmd -C php-fpm8.5
+free -m
+```
+
+現状：
+
+```
+user = www-data / group = www-data
+listen = /run/php/php8.5-fpm.sock
+pm = dynamic
+pm.max_children = 5
+pm.start_servers = 2
+pm.min_spare_servers = 1
+pm.max_spare_servers = 3
+```
+
+アイドル時のメモリ：master 約35MB、poolプロセス各約13MB
+サーバー全体：Mem 1961MB（うちavailable 1562MB）、Swap 2047MB
+
+【メモリ設計の方針】
+
+`pm.max_children` は、swapに依存しない前提で決める。
+
+swapはディスク上の領域であり、実メモリより桁違いに遅い。常時稼働するPHP-FPMがswapに落ちると、レスポンスが恒常的に悪化する。swapは「落ちないための保険」であって「使う前提の容量」ではない。
+
+したがって、次の式が実メモリの安全な範囲に収まるように決める。
+
+```
+pm.max_children × 1プロセスあたりの実使用量
+```
+
+一方、Viteのビルドのような一度きりの処理では、swapを保険として当てにしてよい。遅くても完了することが優先されるためである。
+
+```
+常時稼働するもの（PHP-FPM）  → swap に依存しない
+一度きりの処理（ビルド）      → swap を保険として使ってよい
+```
+
+`pm.max_children` の調整は、アプリを動かしてから実測して行う。アイドル時の値では1リクエストあたりの実使用量が分からないため。
+
+【注意】poolの`listen`は`/run/php/php8.5-fpm.sock`（バージョン固定）だが、Nginxの`fastcgi_pass`は`/run/php/php-fpm.sock`（alternatives経由）である。実体は同じだが参照の仕方が異なる。PHPをアップグレードする際は両方を確認すること。
+
+### 判断：disable_functionsを設定する
+
+```bash
+sudo tee /etc/php/8.5/fpm/conf.d/99-hardening.ini > /dev/null <<'EOF'
+; PHP-FPM の堅牢化
+; 自分の判断による設定はこのファイルに集約する。
+; conf.d は php.ini の後に読まれ、後の値が勝つ。
+; fpm/conf.d に置いているため、CLI（php artisan / composer）には影響しない。
+
+disable_functions = exec,passthru,shell_exec,system,proc_open,popen,pcntl_exec,dl
+EOF
+```
+
+理由：
+
+- Webリクエストから OS コマンドを実行できないようにする。攻撃者がPHPコードを実行できる状態になっても、できることが大きく狭まる
+- このサイトはWebリクエスト中に外部コマンドを呼ばない（画像最適化は開発環境でのみ実行する）
+- fpm/conf.dに置くためCLIには影響しない。「Webからはコマンドを実行できないが、デプロイ作業は普通にできる」状態になる
+
+【影響範囲】
+
+| 対象 | 影響 | 根拠 |
+|---|---|---|
+| queue:work のシグナル制御 | 影響なし | CLIはcli/php.iniを読む。本設定はfpm/conf.dにあるため届かない |
+| php artisan / composer | 影響なし | 同上 |
+| pcntl_exec | 対象が存在しない | pcntl拡張を導入していない。将来導入した場合の保険として列挙している |
+| Webリクエスト中のProcessファサード等 | 未検証 | 本サイトでは使用していないと考えているが未確認。アプリ配置後に全ページを動かして確認すること |
+| MAIL_MAILER=sendmail | 使用できない | proc_openを使うため |
+
+この設定の要は「CLIには一切影響しない」ことである。fpm/conf.dに置いているため、Webからはコマンドを実行できないが、デプロイ作業（artisan / composer）は通常どおり行える。
+
+【7-5への影響】`proc_open` を無効化したため、`MAIL_MAILER=sendmail` は使えない。Resendは SMTP または HTTP API を使うため問題ないが、送信方式を決める際の制約になる。
+
+### 判断：open_basedirは設定しない
+
+open_basedirはPHPからのあらゆるファイル操作の範囲を制限する設定であり、防御としての効果はある。しかし採用しない。
+
+理由：
+
+- 設定漏れがあるとアプリが壊れる。Laravelは`/tmp`や`/dev/urandom`にもアクセスする
+- 壊れたときのエラーが「ファイルが開けません」という一般的なものになり、原因が設定なのかパスなのか権限なのか判別しにくい
+- disable_functionsは壊れても「この関数は無効です」と名指しでエラーが出るのに対し、open_basedirは発見コストが高い
+- PHP公式も、セキュリティ機能として完全ではないとしている
+
+※「防御力」と「壊れる確率」だけでなく、「壊れたときに気づけるか」も判断材料になる、という例である。
+
+将来、より機密性の高いものを扱うようになった場合は再検討の対象とする。
+
+### 検証
+
+設定の反映：
+
+```bash
+sudo php-fpm8.5 -t
+sudo systemctl reload php8.5-fpm
+```
+
+**期待する出力**：`test is successful`
+
+効いているかの確認には、phpinfo() ではなく必要な項目だけを出すファイルを使う。phpinfo() はサーバー構成をすべて公開するため、確認したい項目だけを出すほうが露出する情報が少ない。
+
+```bash
+sudo tee /var/www/html/check.php > /dev/null <<'EOF'
+<?php
+echo "disable_functions = ", ini_get('disable_functions'), "\n";
+foreach (['exec', 'shell_exec', 'system', 'proc_open', 'popen'] as $f) {
+    echo $f, ': ', function_exists($f) ? "ENABLED" : "disabled", "\n";
+}
+echo "opcache.validate_timestamps = ", ini_get('opcache.validate_timestamps'), "\n";
+EOF
+```
+
+`http://<SERVER_IP>/check.php` を開き、各関数が`disabled`と表示されることを確認する。`function_exists()`で実際に呼べるかを見ているため、「設定に書いた」ではなく「実際に無効になっている」ことの確認になる。
+
+確認後は必ず削除し、404になることをブラウザで確かめる。
+
+```bash
+sudo rm /var/www/html/check.php
+```
+
+---
+
+## 17. 運用上の注意（恒久的に発生すること）
 
 - 通常更新（`-updates`）は自動適用されない。月1回程度、手動で `apt update && apt upgrade` を実行する必要がある
 - ポートを開けるときはConoHaセキュリティグループとufwの2箇所を見る
@@ -698,10 +884,16 @@ Webサーバーは外部からの入力を受け取る最前線である。脆�
 - バックアップは未設定。サーバー設定はこの手順書にのみ存在するため、手順書と実物のずれがそのまま復元できない範囲になる
 - PHPをアップグレードする際は、Nginxの設定が参照している `/run/php/php-fpm.sock` の指す先が意図したバージョンかを確認すること
 - `php -v` / `php -m` はCLI側の情報である。FPM側の設定を確認するにはphpinfo()をブラウザから見る必要がある
+- 自動セキュリティ更新が実際に動いたかは、外から試せない。次のコマンドで記録を確認する：`sudo tail -50 /var/log/unattended-upgrades/unattended-upgrades.log`
+- ライブラリ（libcurlなど）が更新されると、needrestartがphp8.5-fpmやnginxを自動で再起動する。サービスの起動時刻が変わっていたら、この可能性を疑う
 
 ---
 
-## 17. 未実施・保留
+## 18. 未実施・保留
 
 - ESM（Ubuntu Pro）：未有効。標準サポート期間中の追加価値が未確認のため保留
 - 監視：未設定。回収先は7-3dまたは7-10
+- pm.max_childrenの調整（アプリ配置後に実測して決める）
+- opcache.max_accelerated_filesが足りているかの実測
+- opcache.validate_timestamps = 0の再検討（デプロイ自動化後）
+- open_basedir（検討したうえで見送り）
