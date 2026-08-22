@@ -19,7 +19,7 @@
 - ConoHa VPS 3.0 / 2GB / 東京リージョン / Ubuntu 26.04 LTS
 - 料金プラン：まとめトク6ヶ月
   - 理由：クレジットカードの更新時期を契約期間の内側に抱え込み、更新イベントの回数を減らすため
-  - 注意：入金が確認できず契約満了を迎えるとサーバーが削除される（詳細は17節）
+  - 注意：入金が確認できず契約満了を迎えるとサーバーが削除される（詳細は25節）
 
 ### オプションの選択と理由
 
@@ -485,6 +485,12 @@ composer.json に `ext-*` の明示的な記載はないため、パッケージ
 
 composer.json から要求されておらず、必要になれば後から追加できる。推測で先回りすると、後から棚卸ししたときに「なぜ入っているか」が説明できなくなる。必要ならインストール時か実行時に明確なエラーが出る。
 
+【後日の訂正】この判断の後、Composerをaptで導入した際にphp8.5-intlが依存関係として自動的に導入された。
+
+害はないが、「入れない」と記録した文書と実態が食い違うことになった。
+
+教訓：「入れない」という判断は、自分が明示的に入れない場合にのみ成立する。依存関係として引き込まれる経路は判断の外にある。「入れない」と決めたものは、後で実際に入っていないかを確認する必要がある。
+
 ### パッケージ名の確認（推測せず実測する）
 
 ```bash
@@ -875,7 +881,318 @@ sudo rm /var/www/html/check.php
 
 ---
 
-## 17. 運用上の注意（恒久的に発生すること）
+## 17. アプリケーションの配置
+
+### 判断：配置場所は /var/www/portfolio
+
+Linuxには置き場所の慣習がある。
+
+| 場所 | 性質 |
+|---|---|
+| /var/www/ | Webコンテンツの標準的な置き場所。Nginxの既定も/var/www/html |
+| /srv/ | サービスのデータ置き場。仕様上はこちらも正しい |
+| /home/`<USER>`/ | ユーザーのホーム |
+
+ホームディレクトリを避ける理由：www-dataがファイルを読むには`/home/<USER>`を辿れる必要があり、ホームのパーミッションを緩めることになる。ホームには`.ssh`など他人に触らせたくないものが入っている。
+
+### 判断：リポジトリの取得はHTTPS
+
+リポジトリがパブリックなため認証が不要である。デプロイキーを作れば管理対象の鍵が1つ増えるが、いま増やす理由がない。将来プライベート化する場合に追加する。
+
+### 手順
+
+```bash
+sudo mkdir -p /var/www/portfolio
+sudo chown <USER>:<USER> /var/www/portfolio
+git clone https://github.com/<OWNER>/<REPO>.git /var/www/portfolio
+```
+
+この時点では所有者を`<USER>:<USER>`にしておく。最終的な所有権はファイルが揃ってから一括で適用する（インストールで新しいファイルが増えるため）。
+
+---
+
+## 18. Composer のインストール
+
+```bash
+apt-cache policy composer      # Candidate が 2.x であることを確認
+sudo apt install -y composer
+composer --version
+```
+
+実測結果（この手順を実行した時点）：
+
+```
+Installed: (none)
+Candidate: 2.9.5-1
+```
+
+インストール後の確認：
+
+```
+Composer version 2.9.5
+PHP version 8.5.4 (/usr/bin/php8.5)
+```
+
+aptを選ぶ理由：unattended-upgradesの自動セキュリティ更新の対象になる。公式インストーラで導入すると更新が手動になる。
+
+Composer 1系では本プロジェクトは動かないため、Candidateが1.xの場合は公式インストーラを使う手順に切り替える。
+
+【注意】この操作でphp8.5-intlとunzipが依存関係として導入される。
+
+---
+
+## 19. .env の作成
+
+```bash
+cd /var/www/portfolio
+cp .env.example .env
+
+sed -i 's|^APP_ENV=.*|APP_ENV=production|' .env
+sed -i 's|^APP_DEBUG=.*|APP_DEBUG=false|' .env
+sed -i 's|^APP_URL=.*|APP_URL=http://<SERVER_IP>|' .env
+sed -i 's|^SESSION_DRIVER=.*|SESSION_DRIVER=file|' .env
+sed -i 's|^CACHE_STORE=.*|CACHE_STORE=file|' .env
+sed -i 's|^QUEUE_CONNECTION=.*|QUEUE_CONNECTION=sync|' .env
+```
+
+【方針】本番に必要な値は、.env.exampleの既定値に依存せず、すべて明示的に設定する。
+
+.env.exampleは開発環境のテンプレートでもあり、将来変わりうる。「既定値がこうだから設定不要」という前提を手順に持ち込むと、テンプレートが変わったときに手順が静かに壊れる。
+
+なおSESSION_DRIVER / CACHE_STORE / QUEUE_CONNECTIONは、現在の.env.exampleの値と一致している（CACHE_STOREとQUEUE_CONNECTIONは7-3c-2で修正した）。sedは冪等なので、実行しても害はない。
+
+【注意】Linuxのsedは`-i`の後に空文字が不要である（macOSとは書式が違う）。
+
+設定値と理由：
+
+| 項目 | 値 | 理由 |
+|---|---|---|
+| APP_ENV | production | 本番環境であることの宣言 |
+| APP_DEBUG | false | trueのままだとエラー時にスタックトレースや環境変数がブラウザに表示される。.envの中身が実質的に見える |
+| APP_URL | サーバーのアドレス | 絶対URL（og:url / og:image）の基点。ここが誤っているとOGPが壊れる |
+| SESSION_DRIVER | file | DBを使わないため |
+| CACHE_STORE | file | throttleミドルウェアがキャッシュを使う。databaseのままだとcacheテーブルが必要になり、問い合わせページが500エラーになる |
+| QUEUE_CONNECTION | sync | キューを使わない方針を明示する |
+| DB_CONNECTION | sqlite（変更せず） | どのコードもDBに触れないため。使わない設定が残っている状態である。唯一、明示的に設定しない項目である。DBを使わないため値に意味がなく、変更する根拠もないため |
+
+APP_DEBUG=falseの副作用：エラーの詳細が画面に出なくなるため、問題が起きたときは`storage/logs/laravel.log`を読むことになる。
+
+---
+
+## 20. 依存パッケージのインストール
+
+```bash
+composer install --no-dev --optimize-autoloader --no-interaction
+```
+
+| オプション | 意味 |
+|---|---|
+| --no-dev | require-dev（PHPUnit、Pint、Sailなど）を入れない |
+| --optimize-autoloader | クラスの場所を事前に一覧化する。実行時にファイルを探す処理が消える |
+| --no-interaction | 対話プロンプトを出さない |
+
+続けてAPP_KEYを生成する。
+
+```bash
+php artisan key:generate
+php artisan about --only=environment
+```
+
+【重要】確認には`php artisan about`を使い、grepで.envのAPP_KEYを表示しないこと。APP_KEYは秘密情報であり、画面やログに残すべきではない。
+
+APP_KEYはセッションとCookieの暗号化、および問い合わせフォームの時間トラップ（Crypt）に使われる。.envにしか存在せずgitには入らないため、サーバーを作り直すと新しい鍵になる。
+
+【記録】laravel/tinkerとpsy/psyshはrequire（require-devではない）に入っているため本番にも導入される。CLIからしか使えないためWeb経由のリスクはないが、本番に不要なものが入っている状態である。require-devへの移動はLaravelの自動検出に影響するため、単純な移動では済まない。
+
+---
+
+## 21. Node.js とアセットのビルド
+
+```bash
+sudo apt install -y nodejs npm
+node -v      # v22.x（開発環境は24。差の影響は下記で実測した）
+npm -v
+
+cd /var/www/portfolio
+npm ci
+npm run build
+```
+
+`npm install`ではなく`npm ci`を使う理由：package-lock.jsonの内容をそのまま再現し、ロックファイルを書き換えないため。本番では「開発環境と同じ依存を再現する」ことが目的である。
+
+【重要】node_modulesを開発機からサーバーへコピーしてはならない。rolldown（Viteのバンドラ）はプラットフォームごとに異なるネイティブバイナリを使うため、必ずサーバー上でnpm ciを実行する。
+
+### 実測結果
+
+| 処理 | 最大メモリ | 所要時間 | swap使用 |
+|---|---|---|---|
+| npm ci | 251MB | 11.7秒 | 0 |
+| npm run build | 294MB | 2.7秒（ビルド本体791ms） | 0 |
+
+2GBのサーバーで、swapを一切使わずに完了した。「小さいVPSではビルドが落ちるのではないか」という懸念は否定された。
+
+計測方法：
+
+```bash
+free -m
+/usr/bin/time -v npm run build 2>&1 | tail -30
+free -m
+```
+
+### 実測結果：ビルド成果物が環境をまたいで一致する
+
+開発機（Node 24 / macOS / arm64）とサーバー（Node 22 / Linux / x86_64）でビルドし、成果物を比較した。
+
+| 項目 | 開発機 | サーバー | 判定 |
+|---|---|---|---|
+| JSファイル名 | app-CYEMFStJ.js | app-CYEMFStJ.js | 一致 |
+| JSサイズ | 416,091 bytes | 416,091 bytes | 一致 |
+| CSSファイル名 | app-BqLPbuc1.css | app-BqLPbuc1.css | 一致 |
+| CSSサイズ | 58,220 bytes | 58,220 bytes | 一致 |
+
+Viteは内容から算出したハッシュでファイル名を決めるため、名前とサイズが一致することは中身が同一であることを意味する。
+
+Nodeのメジャーバージョン差もCPUアーキテクチャの差も、ビルド結果に影響しないことが実測で確認できた。
+
+【この実測の有効範囲】
+
+この結果は、以下のバージョンの組み合わせに対するものである。
+
+```
+開発機 : Node 24.9.0（手動管理）
+本番   : Node 22.22.1（apt。自動セキュリティ更新で上がりうる）
+CI     : node-version: 24 の指定（実行時の最新 24.x が入る）
+```
+
+どの環境もバージョンが固定されていない。aptで導入したNodeはunattended-upgradesの対象であり、CIのsetup-nodeは実行のたびに最新のパッチ版を取得する。
+
+【補足：npmのバージョンとUbuntuでのパッケージ構成】
+
+npmのバージョンも記録しておく。
+
+```
+開発機 : npm 11.6.4
+本番   : npm 9.2.0
+```
+
+Ubuntuではnodejsとnpmが別パッケージであり、npmパッケージが古い（9.2.0）。Node 22に本来同梱されるnpm 10系ではない。
+
+したがってこの実測は「その時点での一致」を示すものであり、将来にわたって一致することを保証するものではない。
+
+実害は小さいと考えられる。ビルド結果の決定性は主にバンドラとpackage-lock.jsonによって担保されており、Nodeのパッチ差が出力を変えることは稀である。ただし「保証されている」わけではない。
+
+```
+実測は時点の記録であって、将来の保証ではない。
+```
+
+【engines宣言との不一致について】
+
+package.jsonは`"engines": { "node": "^24" }`を宣言しているが、本番サーバーではNode 22で`npm ci`を実行している。宣言と実態が食い違っている状態である。実行のたびに`npm WARN EBADENGINE`が表示される。
+
+これは意図的な一時措置である。開発とCIを24に揃える一方、本番のNodeは一時的なものと位置づけたためである。
+
+【解消の予定】デプロイをCIビルド＋成果物転送に切り替えた時点で、本番サーバーからNode.jsを削除する。その時点でこの不一致は解消される。
+
+※ この不一致を「一時的だから」と放置すると、PHPのバージョン不一致が7ヶ月間残ったのと同じことになる。切り替えを行わない判断をした場合は、enginesを`>=22`に緩めるなど、宣言と実態を一致させる対応が必要である。
+
+【npm依存の脆弱性について】
+
+`.npmrc`に`audit=true`が設定されており、`npm ci`のたびに監査が走る。本手順の実行時点でhigh severityの脆弱性が6件報告された。
+
+```bash
+npm audit --omit=dev --audit-level=high
+→ found 0 vulnerabilities
+```
+
+本番依存（dependencies）には脆弱性がなく、6件はすべてdevDependencies（ビルドツール）側である。ブラウザに配信される成果物には含まれない。
+
+CIに`npm audit`のゲートを設ける件は別Issueとして管理している（PHP側には`composer audit`があるが、JavaScript側には同等のものがない）。
+
+なお`npm audit fix`はサーバー上で実行してはならない。package-lock.jsonはリポジトリ管理下のファイルであり、サーバーで書き換えるとgit管理外の差分が生まれる。
+
+---
+
+## 22. 所有権とパーミッション
+
+```bash
+cd /var/www/portfolio
+sudo chown -R <USER>:www-data .
+sudo chmod -R u=rwX,g=rX,o= .
+sudo chmod -R u=rwX,g=rwX,o= storage bootstrap/cache
+sudo find storage bootstrap/cache -type d -exec chmod g+s {} \;
+```
+
+| 操作 | 内容 |
+|---|---|
+| chown | 所有者は`<USER>`（デプロイする人）、グループはwww-data（実行する人） |
+| 1つ目のchmod | 所有者は読み書き、グループは読み取りのみ、その他は一切アクセス不可 |
+| 2つ目のchmod | storageとbootstrap/cacheのみグループにも書き込みを許可 |
+| find + g+s | この2つにsetgidを付ける |
+
+大文字のXを使う理由：ディレクトリには中を辿るための実行権限が必要だが、通常のファイルには不要である。Xは「ディレクトリ、または既に実行権限があるファイル」にのみ実行権を付けるため、artisanなどを壊さない。
+
+o=（その他は権限なし）にする理由：644にすると.envが誰でも読める。www-dataはグループとして読めるため、これで十分である。
+
+setgidを付ける理由：このディレクトリに新しく作られるファイルが自動的にwww-dataグループになる。`<USER>`がstorageに書いたときにグループが`<USER>`になるとwww-dataが読めなくなる。
+
+### 検証（権限の表示を読むのではなく、実際に試す）
+
+```bash
+sudo -u www-data test -r .env && echo "readable" || echo "NOT readable"
+sudo -u www-data test -w storage/logs && echo "writable" || echo "NOT writable"
+```
+
+www-dataが.envを読めないとLaravelが起動せず、storage/logsに書けないとログが残らない。どちらも「500エラーだけ出て原因が分からない」典型的な詰まり方になる。
+
+---
+
+## 23. 各種キャッシュの生成
+
+```bash
+php artisan config:cache
+php artisan route:cache
+php artisan view:cache
+php artisan about --only=cache
+```
+
+【重要】config:cacheを実行すると、Laravelは以後.envを読まなくなる。すべての設定値がbootstrap/cache/config.phpにまとめられ、そこから読まれる。
+
+.envを書き換えても、config:cacheをやり直すまで反映されない。APP_URLをドメインに変更する際なども、必ずconfig:cacheをやり直すこと。
+
+route:cacheは、ルート定義に無名関数（クロージャ）が含まれていると「Unable to prepare route for serialization. Uses Closure.」で失敗する。その場合はクロージャをコントローラに移すか、route:cacheを使わない。
+
+---
+
+## 24. ファイル権限に関する重要な性質
+
+config:cacheを実行した直後のbootstrap/cacheを確認すると、生成されたファイルは`-rw-rw-r--`（664）になっている。先に設定したo=（その他は権限なし）が効いていない。
+
+理由：chmodは既存のファイルにしか効かない。新しく作られるファイルには、そのときのumaskに従った権限が付く。
+
+```
+ファイル単位の権限は、新規作成のたびにリセットされる。
+ディレクトリの権限が、実質的な防御線になっている。
+```
+
+bootstrap/cacheは`drwxrws---`であり、その他はディレクトリを辿れない。中のファイルの権限がどうであれ、ディレクトリに入れなければ開けない。プロジェクトのルート自体もo=のため、そもそも中に入れない。
+
+したがって現状で実害はないが、より明示的にするなら、デプロイ手順でumask 027を設定してからコマンドを実行する方法がある。
+
+【注意：これは「その他のユーザー」に対する話である】
+
+上記で「実害がない」としたのは、others（所有者でもグループでもないユーザー）に対する防御についてである。ディレクトリを辿れないため、中のファイルの権限がどうであれ開けない。
+
+一方、www-dataに対する防御は別の話であり、まだ緩い状態にある。
+
+bootstrap/cacheにはグループ（www-data）の書き込み権限が残っている。bootstrap/cache/config.phpはLaravelが起動時に読み込むPHPファイルであり、ここに書き込めるということは実質的に任意のコードを実行させられることを意味する。
+
+これは「実行ユーザーとファイル所有権の設計」の節で「残るリスク」として挙げたものと同じである。
+
+対処：デプロイ時に`<USER>`がキャッシュを生成し、www-dataには読み取り権限だけを与える。サイトの表示を確認した後に適用する（未実施・保留の節を参照）。
+
+---
+
+## 25. 運用上の注意（恒久的に発生すること）
 
 - 通常更新（`-updates`）は自動適用されない。月1回程度、手動で `apt update && apt upgrade` を実行する必要がある
 - ポートを開けるときはConoHaセキュリティグループとufwの2箇所を見る
@@ -886,10 +1203,11 @@ sudo rm /var/www/html/check.php
 - `php -v` / `php -m` はCLI側の情報である。FPM側の設定を確認するにはphpinfo()をブラウザから見る必要がある
 - 自動セキュリティ更新が実際に動いたかは、外から試せない。次のコマンドで記録を確認する：`sudo tail -50 /var/log/unattended-upgrades/unattended-upgrades.log`
 - ライブラリ（libcurlなど）が更新されると、needrestartがphp8.5-fpmやnginxを自動で再起動する。サービスの起動時刻が変わっていたら、この可能性を疑う
+- aptで導入したパッケージ（Node.js、Composer、PHP、Nginx）はunattended-upgradesの対象であり、セキュリティ更新でバージョンが自動的に上がる。ビルド成果物の一致を検証した結果は、検証時点のバージョンに対するものであり、更新後も同じとは限らない
 
 ---
 
-## 18. 未実施・保留
+## 26. 未実施・保留
 
 - ESM（Ubuntu Pro）：未有効。標準サポート期間中の追加価値が未確認のため保留
 - 監視：未設定。回収先は7-3dまたは7-10
@@ -897,3 +1215,5 @@ sudo rm /var/www/html/check.php
 - opcache.max_accelerated_filesが足りているかの実測
 - opcache.validate_timestamps = 0の再検討（デプロイ自動化後）
 - open_basedir（検討したうえで見送り）
+- bootstrap/cacheのグループ書き込み権限を締める（7-3bの設計では「www-dataには読み取り権限だけを与える」としている。サイトが表示されることを確認してから締め、締めた後も動くことを確認するという順序にするため保留している）
+- デプロイ手順でのumask 027の適用
