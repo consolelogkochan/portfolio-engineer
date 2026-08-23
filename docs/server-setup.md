@@ -19,7 +19,7 @@
 - ConoHa VPS 3.0 / 2GB / 東京リージョン / Ubuntu 26.04 LTS
 - 料金プラン：まとめトク6ヶ月
   - 理由：クレジットカードの更新時期を契約期間の内側に抱え込み、更新イベントの回数を減らすため
-  - 注意：入金が確認できず契約満了を迎えるとサーバーが削除される（詳細は25節）
+  - 注意：入金が確認できず契約満了を迎えるとサーバーが削除される（詳細は33節）
 
 ### オプションの選択と理由
 
@@ -1192,7 +1192,261 @@ bootstrap/cacheにはグループ（www-data）の書き込み権限が残って
 
 ---
 
-## 25. 運用上の注意（恒久的に発生すること）
+## 25. Nginx のサーバーブロック設定
+
+14節で作成した暫定の`default`設定を、ここで本来のアプリ用serverブロックに置き換える（ソケットパスや`fastcgi-php.conf`の説明は14節を参照し、ここでは繰り返さない）。
+
+`/etc/nginx/sites-available/portfolio`を以下の内容で作成した。
+
+```nginx
+server {
+    listen 80 default_server;
+    listen [::]:80 default_server;
+
+    server_name _;
+
+    # ドキュメントルートは public/ を指す。
+    # これにより .env / app/ / vendor/ は Nginx から到達できない。
+    root /var/www/portfolio/public;
+    index index.php;
+
+    charset utf-8;
+
+    # Nginx のバージョンをレスポンスヘッダとエラーページから隠す
+    server_tokens off;
+
+    # 静的ファイルが実在すればそれを返し、なければ index.php に渡す
+    location / {
+        try_files $uri $uri/ /index.php?$query_string;
+    }
+
+    # PHP は PHP-FPM に渡す
+    location ~ \.php$ {
+        include snippets/fastcgi-php.conf;
+        fastcgi_pass unix:/run/php/php-fpm.sock;
+    }
+
+    # ドットファイルへのアクセスを拒否する。
+    # ただし .well-known は Let's Encrypt の証明書取得に必要なため除外する。
+    location ~ /\.(?!well-known).* {
+        deny all;
+    }
+}
+```
+
+有効化と検証：
+
+```bash
+sudo ln -s /etc/nginx/sites-available/portfolio /etc/nginx/sites-enabled/portfolio
+sudo unlink /etc/nginx/sites-enabled/default
+sudo nginx -t
+sudo systemctl reload nginx
+```
+
+### 判断の理由
+
+- **`root`を`public/`に置くことが、構造による境界である。** アプリケーションコードや`.env`はNginxのドキュメントルートの外にあるため、設定ミスによる漏洩ではなく「そもそも到達経路がない」状態になる
+- **`try_files $uri $uri/ /index.php?$query_string;`がフロントコントローラへの委譲である。** 実在するファイルはNginxが直接返し、それ以外は全てLaravelが受け取る
+- **defaultサイトは削除ではなく`unlink`で無効化した。** `/var/www/html/index.nginx-debian.html`と`/etc/nginx/sites-available/default`はNginxパッケージが管理するファイルであり、手で削除するとパッケージ再インストール時に復活して追跡しにくい状態を作るため、参照経路を断つにとどめた
+- **意図的に入れなかった設定が2つある。** `location = /robots.txt`はLaravel側のルートで扱うため。`error_page 404 /index.php`は、botによる`.php`スキャンでPHPプロセスを起動させないため
+
+---
+
+## 26. メモリの実測と max_children の根拠
+
+実測値（2026-08-23）：
+
+| 測り方 | master | worker | 合計 |
+|---|---|---|---|
+| RSS | 37.9MB | 43.4MB / 47.4MB | 128.7MB |
+| PSS | 16.8MB | 18.2MB / 22.1MB | 57.1MB |
+| systemd cgroup | — | — | 60.2MB |
+
+測定コマンド：
+
+```bash
+ps --no-headers -o rss,args -C php-fpm8.5
+systemctl status php8.5-fpm --no-pager | head -20
+for p in $(pgrep -x php-fpm8.5); do echo -n "$p "; sudo awk '/^Pss:/ {print $2, "kB"}' /proc/$p/smaps_rollup; done
+```
+
+【測定条件について】16節のメモリ実測（poolプロセス各約13MB）は、Laravelアプリを配置する前、PHP-FPMを入れた直後の値である。この節の実測（各43.4MB / 47.4MB）は、実アプリとOPcacheが稼働した後の値であり、前提が異なる。両者は同じ基準の数値ではないため、比較・参照の際は測定時点の違いに注意すること。
+
+### 判断の理由
+
+- **RSSで`max_children`を計算してはいけない。** RSSは共有ページ（共有ライブラリ、OPcacheの共有メモリ、copy-on-writeの未変更ページ）をプロセスごとに重複計上するため、workerあたりの増分を過大に見積もる
+- **PSS合計57.1MBがcgroupの60.2MBとほぼ一致したことが、読み方の検算になった**
+- **worker 1つあたりの実質増分は約20MB。** `max_children = 10`にするとPHP-FPM全体が約220MB、総メモリ1961MBの11%になる見込み（実際の変更は次節）
+- **swapには依存しない前提で決めた**（16節の方針を参照）
+
+---
+
+## 27. PHP-FPM の pm.max_children を 5 → 10 に変更
+
+前節の実測にもとづき、`/etc/php/8.5/fpm/pool.d/www.conf`を直接編集した。
+
+```bash
+sudo cp /etc/php/8.5/fpm/pool.d/www.conf /etc/php/8.5/fpm/pool.d/www.conf.bak
+sudo sed -i 's/^pm\.max_children = 5$/pm.max_children = 10/' /etc/php/8.5/fpm/pool.d/www.conf
+sudo php-fpm8.5 -t
+sudo systemctl reload php8.5-fpm
+sudo php-fpm8.5 -tt 2>&1 | grep -n "max_children"
+```
+
+### 判断の理由
+
+- **pool設定は`conf.d/`に別ファイルを置く方式が使えない。** 同じ`[www]`プールを複数ファイルで定義できないため、`www.conf`を直接編集する。7-3aのsshdや16節（本番向けPHP設定）の`conf.d/99-hardening.ini`とは異なるパターンである
+- **`php-fpm8.5 -t`は構文検査、`-tt`は解釈後の設定全体のダンプ。** `sshd -T`や`apt-config dump`と同じ「実効値を見る手段」
+- **`.bak`を同じディレクトリに置いても読み込まれない。** includeのパターンが`pool.d/*.conf`のため
+
+---
+
+## 28. OPcache の実測
+
+`public/`に一時ファイルを置き、`curl`で取得して即削除する方法で測定した（16節の`check.php`と同じ型）。
+
+実測値（2026-08-23）：
+
+| 項目 | 値 |
+|---|---|
+| used / free | 26.9MB / 100.9MB（既定`memory_consumption=128M`、使用率21%） |
+| num_cached_scripts | 833 / 10000 |
+| hits / misses | 14217 / 836（ヒット率94.4%） |
+| oom_restarts | 0 |
+
+### 判断の理由
+
+- **misses 836とnum_cached_scripts 833がほぼ一致している。** missのほぼ全てが初回コンパイルであり、キャッシュからの追い出しによる再コンパイルが起きていない。よって既定値のままでよい（16節の判断が実測で裏付けられた）
+- **OPcacheの128MBは全workerで共有される。** workerを増やしても増えない
+
+---
+
+## 29. bootstrap/cache の権限を締めた
+
+7-3c-2の欠点指摘①（www-dataがグループ書き込みできる状態）を解消した。
+
+```bash
+sudo chmod g-w,o-rwx /var/www/portfolio/bootstrap/cache
+sudo chmod g-w,o-rwx /var/www/portfolio/bootstrap/cache/*
+sudo chmod g-w,o-rwx /var/www/portfolio/bootstrap/cache/.gitignore
+```
+
+### 判断の理由
+
+- **bootstrap/cacheとstorageは求められる権限が異なる。** 前者はデプロイ時に`<USER>`が生成しwww-dataは読むだけでよい。後者はwww-dataが実行時に書く（セッション・キャッシュ・ログ）ため、ディレクトリのグループ書き込みを残す
+- **chmodだけでは不十分。** `config:cache`のたびにファイルが作り直され、新しいファイルにはumaskに従った権限が付くため。既存ファイルは`chmod`、今後の生成は`umask`の両方が要る（umaskの適用は当初30節に記載したが、後日方針を変更した。詳細は本節末尾を参照）
+- **chmodの対象に`*`を使うとドットファイルが漏れる。** `.gitignore`を個別に指定した
+- **setgid（`s`）は`g-w`では消えない。** setgidの役割はグループの継承であり、書き込み許可とは別のもの
+
+### 【2026-08-23の記録と、その後の方針転換】
+
+同日、`(umask 027 && php artisan config:cache && php artisan route:cache && php artisan view:cache)`を実行し、`640`のキャッシュファイルを生成した。この事実は記録として残す。
+
+しかしこの方式は継続採用しない。理由は30節に詳細を記載しているため、ここでは要点のみ記す。
+
+- 二本立て（`chmod`と`umask`を対象ごとに使い分ける）は適用漏れを生む。実際に`config:cache`だけをumaskで守り、同じディレクトリの`packages.php` / `services.php`を守り損ねた
+- 必要な権限は対象ごとに異なる（`vendor/`はwww-dataが読めなければならず、`bootstrap/cache`は書かせてはならず、`storage/`は書けなければならない）。一律のumaskではこれを表現できない
+
+30節「更新時のデプロイ手順」には、生成後に一括で権限を再適用する方式（`chgrp` / `chmod`）を記載した。
+
+---
+
+## 30. 更新時のデプロイ手順
+
+これまでの記録は初回構築の作業列であり、2回目以降の手順として整理されていなかった。実際に2026-08-23のデプロイで`config:cache`の再実行が漏れ、本番がconfigキャッシュなしで動く状態になった。
+
+### 問題：umaskだけでは守りきれない
+
+当初、`(umask 027 && php artisan config:cache && php artisan route:cache && php artisan view:cache)`という形で`umask 027`のサブシェルを使い、キャッシュ生成コマンドだけを囲んでいた（29節に記録）。
+
+しかし`composer install`は`bootstrap/cache/packages.php`と`services.php`を新規作成するため、それらは`umask 027`の外側で実行され、サーバーの実際のumask（`0002`）に従って`664`（グループ書き込み可）で作られる。29節で締めた穴が、デプロイのたびに再び開いてしまう。
+
+さらに実測により以下が判明した（2026-08-23）：
+
+- サーバーのumaskは`0002`
+- `<USER>`のプライマリグループは`<USER>`であり、**www-dataグループには属していない**
+- `/var/www/portfolio`以下のディレクトリに**setgidは付いていない**（storageとbootstrap/cacheを除く）
+
+したがって、新規作成されるファイルのグループは`<USER>`になる。
+
+| デプロイ時のumask | 新規ファイル | グループ | www-dataから見ると |
+|---|---|---|---|
+| 002（現状） | 664 / 775 | `<USER>` | otherとして読める（動くが`o=`の設計に反する） |
+| 027 | 640 / 750 | `<USER>` | **otherなので読めない → 500エラー** |
+
+**`umask 027`を`composer install`まで広げると`vendor/`が読めなくなり本番が停止する。**
+
+### 採用した方針
+
+「作る側を変える（umask）」ではなく「作った後に直す（chgrp / chmod）」に統一する。`umask 027`のサブシェルは廃止する。
+
+理由：
+
+- **二本立ては適用漏れを生む。** 実際に`config:cache`だけをumaskで守り、同じディレクトリの`packages.php` / `services.php`を守り損ねた
+- **必要な権限は対象ごとに異なる。** `vendor/`はwww-dataが読めなければならず、`bootstrap/cache`は書かせてはならず、`storage/`は書けなければならない。一律のumaskではこれを表現できない
+- 「最後に必ず全体へ再適用する」なら、対象を列挙し忘れる経路が構造的に存在しない
+
+### 手順
+
+```bash
+cd /var/www/portfolio
+git pull
+composer install --no-dev --optimize-autoloader --no-interaction
+npm ci
+npm run build
+php artisan config:cache
+php artisan route:cache
+php artisan view:cache
+sudo chgrp -R www-data /var/www/portfolio
+sudo chmod -R u=rwX,g=rX,o= /var/www/portfolio
+sudo chmod -R g+w /var/www/portfolio/storage
+sudo find /var/www/portfolio/storage /var/www/portfolio/bootstrap/cache -type d -exec chmod g+s {} \;
+php artisan about --only=cache
+```
+
+### 判断の理由
+
+- **`composer install`はconfigキャッシュを破棄する。** 実験で確認済み（`config:cache`実行後に`composer install --no-dev --optimize-autoloader`を流すと`bootstrap/cache/config.php`が消え、`packages.php`と`services.php`は再生成され、`routes-v7.php`は残る）。したがって`composer install`→`config:cache`の順序が必須
+- **権限の再適用は、全ての生成が終わった後にまとめて実行する**
+- **`find ... -exec chmod g+s`を入れているのは、`chmod -R u=rwX,g=rX,o=`がsetgidを落とす可能性があるため。** 落ちるかどうかは実装依存で未検証だが、明示的に付け直せばどちらでも同じ結果になる。setgidが落ちると、次に`view:cache`を実行したとき`storage/framework/views/`のファイルがグループ`<USER>`で作られ、www-dataから読めなくなる
+- **完了確認は`php artisan about --only=cache`。** `Config` / `Routes` / `Views`が`CACHED`であること（`Events`は`NOT CACHED`でよい）
+
+`npm ci` / `npm run build`は7-4でCIビルドへ移行する判断を予定しているため、その時点でこの手順から外れる可能性がある。
+
+この権限再適用ブロックは2026-08-23に実機で実行し、以下を確認済み。
+
+- `storage`系が`drwxrws---`
+- `bootstrap/cache`が`drwxr-s---`、配下のファイルは`-rw-r-----` / `-rwxr-x---`
+- `.env`が`-rw-r-----` `<USER>`:www-data
+- 全ページと問い合わせフォームが正常に動作し、新規エラーなし
+
+---
+
+## 31. トラブルシューティング：--no-dev で欠ける暗黙依存
+
+初回公開時に500エラーが発生した。原因は`symfony/yaml`が本番の`vendor/`に無かったこと。
+
+- league/commonmarkのFrontMatter拡張は`symfony/yaml`を**suggest（推奨）**として宣言しており、必須依存ではない
+- 開発環境では`laravel/sail`（`require-dev`）が間接的に引き込んでいた
+- `composer install --no-dev`でその引き込みが消え、Markdownのfront matter解析が失敗した
+
+対処：`composer require symfony/yaml`で`require`に明示追加した。
+
+- **ホストのMacはPHP 8.4であり、composer.jsonの`php ^8.5`を満たさないため、composerをホストで実行できない。** Sailコンテナ内（PHP 8.5）で実行した。このリポジトリのcomposer操作は今後コンテナ内で行う
+- `--ignore-platform-req=php`で押し通す方法は採らない。「本番と同じPHPで依存解決する」前提が壊れるため
+
+---
+
+## 32. ESM（Ubuntu Pro）を有効化しない判断
+
+`pro security-status`で保留中の3件は`node-lodash` / `node-lodash-packages` / `node-shell-quote`であり、いずれも`apt install npm`が引き込んだuniverseのパッケージである。本番のWebリクエスト処理には無関係。
+
+- **7-4でNode.jsをサーバーから削除すれば、universe依存の大半が消える**
+- ESMは外部サービスへの依存を増やすため、それに見合う対象が存在しない現状では有効化しない
+
+---
+
+## 33. 運用上の注意（恒久的に発生すること）
 
 - 通常更新（`-updates`）は自動適用されない。月1回程度、手動で `apt update && apt upgrade` を実行する必要がある
 - ポートを開けるときはConoHaセキュリティグループとufwの2箇所を見る
@@ -1207,13 +1461,14 @@ bootstrap/cacheにはグループ（www-data）の書き込み権限が残って
 
 ---
 
-## 26. 未実施・保留
+## 34. 未実施・保留
 
-- ESM（Ubuntu Pro）：未有効。標準サポート期間中の追加価値が未確認のため保留
+- ESM（Ubuntu Pro）：未有効。標準サポート期間中の追加価値が未確認のため保留 → 解決：7-3c-3で「有効化しない」と判断（32節）
 - 監視：未設定。回収先は7-3dまたは7-10
-- pm.max_childrenの調整（アプリ配置後に実測して決める）
-- opcache.max_accelerated_filesが足りているかの実測
+- pm.max_childrenの調整（アプリ配置後に実測して決める） → 解決：7-3c-3で実測のうえ10に変更（26節・27節）
+- opcache.max_accelerated_filesが足りているかの実測 → 解決：7-3c-3の実測で既定値のままでよいと確認（28節）
 - opcache.validate_timestamps = 0の再検討（デプロイ自動化後）
 - open_basedir（検討したうえで見送り）
-- bootstrap/cacheのグループ書き込み権限を締める（7-3bの設計では「www-dataには読み取り権限だけを与える」としている。サイトが表示されることを確認してから締め、締めた後も動くことを確認するという順序にするため保留している）
-- デプロイ手順でのumask 027の適用
+- bootstrap/cacheのグループ書き込み権限を締める（7-3bの設計では「www-dataには読み取り権限だけを与える」としている。サイトが表示されることを確認してから締め、締めた後も動くことを確認するという順序にするため保留している） → 解決：7-3c-3で締めた（29節）
+- デプロイ手順でのumask 027の適用 → 解決していない。7-3c-3では採用せず、「作った後に直す」方式（chgrp / chmod）を選んだ（30節参照）
+- setgidの再帰付与とumask 027によるデプロイ（案B）の検討。`/var/www/portfolio`以下のディレクトリにsetgidを再帰付与すれば、新規ファイルのグループがwww-dataを継承するため、`umask 027`だけで正しい権限になり、デプロイのたびのchgrp / chmodが不要になる。ただしstorageの書き込み権限の扱い、php-fpm側のumask、既存ディレクトリへの一括付与という3つの設計判断を伴うため、7-4のデプロイ自動化と一体で検討する
