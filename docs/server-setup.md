@@ -6,6 +6,8 @@
 伏せている情報は次の通りです。実際の値には置き換えず、プレースホルダのまま参照してください。
 
 - IPアドレス → `<SERVER_IP>`
+- サーバーのIPv6アドレス → `<SERVER_IPV6>`
+- 旧サーバー（ロリポップ）のIPアドレス → `<LOLIPOP_IP>`
 - 作業用ユーザー名 → `<USER>`
 - 公開鍵の実体 → `<PUBLIC_KEY>`
 - パスワード・パスフレーズは本文中に一切記載していません
@@ -19,7 +21,7 @@
 - ConoHa VPS 3.0 / 2GB / 東京リージョン / Ubuntu 26.04 LTS
 - 料金プラン：まとめトク6ヶ月
   - 理由：クレジットカードの更新時期を契約期間の内側に抱え込み、更新イベントの回数を減らすため
-  - 注意：入金が確認できず契約満了を迎えるとサーバーが削除される（詳細は33節）
+  - 注意：入金が確認できず契約満了を迎えるとサーバーが削除される（詳細は35節）
 
 ### オプションの選択と理由
 
@@ -1196,14 +1198,16 @@ bootstrap/cacheにはグループ（www-data）の書き込み権限が残って
 
 14節で作成した暫定の`default`設定を、ここで本来のアプリ用serverブロックに置き換える（ソケットパスや`fastcgi-php.conf`の説明は14節を参照し、ここでは繰り返さない）。
 
-`/etc/nginx/sites-available/portfolio`を以下の内容で作成した。
+7-3d-1で、1ファイル1ブロックから2ファイル2ブロックになった。最終形は以下。
+
+`/etc/nginx/sites-available/portfolio`：
 
 ```nginx
 server {
-    listen 80 default_server;
-    listen [::]:80 default_server;
+    listen 80;
+    listen [::]:80;
 
-    server_name _;
+    server_name new.ikshowcase.site;
 
     # ドキュメントルートは public/ を指す。
     # これにより .env / app/ / vendor/ は Nginx から到達できない。
@@ -1214,6 +1218,16 @@ server {
 
     # Nginx のバージョンをレスポンスヘッダとエラーページから隠す
     server_tokens off;
+
+    # 公開前の暫定措置。中身が揃い apex へ切り替える 7-9 で外す。
+    auth_basic "Restricted";
+    auth_basic_user_file /etc/nginx/.htpasswd;
+
+    # 証明書の取得・更新はこの経路を通るため、認証の対象から外す。
+    # 置き場所（root）は 7-3d-2 で取得方式を決めるときに確定する。
+    location ^~ /.well-known/acme-challenge/ {
+        auth_basic off;
+    }
 
     # 静的ファイルが実在すればそれを返し、なければ index.php に渡す
     location / {
@@ -1234,21 +1248,70 @@ server {
 }
 ```
 
-有効化と検証：
+【依存関係】この設定の`auth_basic`の2行は、33節で作成する`/etc/nginx/.htpasswd`に依存する。上から順に再構築する場合は、33節を先に実施してから本節を適用すること。（`nginx -t`を通過しても、ファイルが存在しなければ実行時にエラーになる。この挙動は未検証であり、確認していない。）
+
+`/etc/nginx/sites-available/default-deny`（新設）：
+
+```nginx
+server {
+    listen 80 default_server;
+    listen [::]:80 default_server;
+
+    server_name _;
+
+    return 444;
+}
+```
+
+有効化：
 
 ```bash
-sudo ln -s /etc/nginx/sites-available/portfolio /etc/nginx/sites-enabled/portfolio
-sudo unlink /etc/nginx/sites-enabled/default
+sudo ln -s /etc/nginx/sites-available/default-deny \
+           /etc/nginx/sites-enabled/default-deny
 sudo nginx -t
 sudo systemctl reload nginx
 ```
 
-### 判断の理由
+### 判断の理由（初期構築時）
 
 - **`root`を`public/`に置くことが、構造による境界である。** アプリケーションコードや`.env`はNginxのドキュメントルートの外にあるため、設定ミスによる漏洩ではなく「そもそも到達経路がない」状態になる
 - **`try_files $uri $uri/ /index.php?$query_string;`がフロントコントローラへの委譲である。** 実在するファイルはNginxが直接返し、それ以外は全てLaravelが受け取る
-- **defaultサイトは削除ではなく`unlink`で無効化した。** `/var/www/html/index.nginx-debian.html`と`/etc/nginx/sites-available/default`はNginxパッケージが管理するファイルであり、手で削除するとパッケージ再インストール時に復活して追跡しにくい状態を作るため、参照経路を断つにとどめた
+- **defaultサイトは削除ではなく`unlink`で無効化した。** `/var/www/html/index.nginx-debian.html`と`/etc/nginx/sites-available/default`はNginxパッケージが管理するファイルであり、手で削除するとパッケージ再インストール時に復活して追跡しにくい状態を作るため、参照経路を断つにとどめた。7-3d-1で受け皿のブロックを新設した際も、パッケージ管理下の`default`を書き換えるのではなく`default-deny`という別ファイルを作成した。同じ判断の延長である
 - **意図的に入れなかった設定が2つある。** `location = /robots.txt`はLaravel側のルートで扱うため。`error_page 404 /index.php`は、botによる`.php`スキャンでPHPプロセスを起動させないため
+
+### 判断の理由（7-3d-1 で追加）
+
+- **`server_name _;`は「すべてに一致する」記号ではない。** 実際は「どのHostヘッダとも一致しない名前」であり、すべてが落ちてくるのは`default_server`の効果である。したがって名前を明示しただけでは不十分で、`default_server`を別ブロックへ移す操作が別途必要になる
+- **一致しないリクエストは301ではなく444で切る。** 到達するのはIP直打ちか、第三者がこのサーバーへ向けた名前でのアクセスであり、ほぼ自動走査である。転送は「本物はこちらにある」と案内することになる。444は応答を返さず接続を閉じるため、消費する資源が最も少ない
+- **`default_server`はIPv4とIPv6の両方に置く。** 片方だけだと、もう片方は引き続きポートフォリオ用ブロックに落ちる。8節でufwをv4/v6の両方で確認したのと同じ形の取りこぼしである。このサーバーには実在するIPv6アドレスが割り当てられているため、机上の話ではない
+- **記述の順序に制約がある。** `default_server`は同じ待ち受けに1つしか置けない。ポートフォリオ側から外してから受け皿側に付けないと、`nginx -t`が`duplicate default server`で失敗する
+
+### 検証
+
+サーバー上（IPv6側）：
+
+```bash
+curl -s -o /dev/null -w '%{http_code}\n' -g 'http://[::1]/'
+curl -s -o /dev/null -w '%{http_code}\n' -g -H 'Host: new.ikshowcase.site' 'http://[::1]/'
+```
+
+期待する出力：`000`、`401`
+
+作業端末から（IPv4側）：
+
+```bash
+curl -s -o /dev/null -w '%{http_code}\n' http://<SERVER_IP>/
+curl -s -o /dev/null -w '%{http_code}\n' -H 'Host: example.com' http://<SERVER_IP>/
+curl -s -o /dev/null -w '%{http_code}\n' -u '<USER>' -H 'Host: new.ikshowcase.site' http://<SERVER_IP>/
+```
+
+期待する出力：`000`、`000`、`200`
+
+`000`は「HTTPの応答コードが返らなかった」という意味であり、444が働いた証拠である（エラーではない）。
+
+3つ目の検証（`Host`ヘッダを付けてIPへ直接アクセスする）の意味：DNSを経由せずサーバーを名指しで確かめる手段が残っている。1節でICMPを含めた「観測できる手段を自分から捨てない」と同じ判断である。
+
+名前を経由した経路全体の確認は、DNSの設定が済んだ後に行う必要があるため、34節の検証に置いている。本節の検証は、DNSの状態に関わらずNginxの設定だけを対象とする。
 
 ---
 
@@ -1446,7 +1509,147 @@ php artisan about --only=cache
 
 ---
 
-## 33. 運用上の注意（恒久的に発生すること）
+## 33. 公開範囲の制限（Basic認証）
+
+**目的**：名前を配る前に、到達できる相手を自分だけに絞る。
+
+### なぜ証明書取得より前に行うか
+
+公的に信頼される証明書は、Certificate Transparencyという公開の追記専用ログに必ず記録される。ログは誰でも監視でき、新しいホスト名を拾って走査するボットが実在する。証明書を取得した時点で、`new.ikshowcase.site`の存在が公表される。DNSを引いただけの段階とは前提が変わるため、閉じるのが先になる。
+
+### 手順
+
+```bash
+openssl passwd -6
+```
+
+プロンプトに応答してパスワードを入力し、`$6$`で始まるハッシュを得る。パスワードをコマンドラインに書かないのは、シェルの履歴に平文で残るため。
+
+```bash
+sudo tee /etc/nginx/.htpasswd > /dev/null <<'EOF'
+<USER>:<PASSWORD_HASH>
+EOF
+
+sudo chown root:www-data /etc/nginx/.htpasswd
+sudo chmod 640 /etc/nginx/.htpasswd
+```
+
+### 検証
+
+```bash
+ls -l /etc/nginx/.htpasswd
+sudo -u www-data test -r /etc/nginx/.htpasswd && echo "readable" || echo "NOT readable"
+```
+
+期待する出力：`-rw-r----- 1 root www-data`、および`readable`
+
+```bash
+curl -s -o /dev/null -w '%{http_code}\n' \
+     -H 'Host: new.ikshowcase.site' http://<SERVER_IP>/
+curl -s -o /dev/null -w '%{http_code}\n' \
+     -H 'Host: new.ikshowcase.site' http://<SERVER_IP>/.well-known/acme-challenge/test
+curl -s -o /dev/null -w '%{http_code}\n' \
+     -u '<USER>' -H 'Host: new.ikshowcase.site' http://<SERVER_IP>/
+```
+
+期待する出力：`401`、`404`、`200`
+
+`Host`ヘッダを明示すれば、DNSの設定状況に関わらず、サーバー側の設定だけを検証できる。25節で`default_server`を444に振り分けた後はIP直打ちでは到達できず、DNS設定前は名前でも到達できないため、この書き方が唯一DNSに依存しない確認手段になる。
+
+### 判断と注意
+
+- **apache2-utils（htpasswdコマンド）は導入しない。** 既に入っているopensslで生成したSHA-512 crypt形式をNginxが検証できることを実測で確認した。13節でApache関連を避けた判断、32節の「導入するものを減らせば更新対象も攻撃面も減る」と整合する
+- **所有権の設計は22節と同じ。** 所有者は変更する人（root）、グループは読む人（www-data）、その他はアクセス不可。権限の表示を読むのではなく、`sudo -u www-data`で実際に読めるかを試す
+- **`/.well-known/acme-challenge/`の確認は404であること。** 401なら認証がかかったまま、404なら認証を抜けてファイルを探しに行った証拠。「設定に書いた」ではなく「実際に外れている」ことの確認であり、16節の`function_exists()`による確認と同じ考え方
+- **HTTPS化前は、資格情報が経路上を平文で流れる。** したがって他で使用しているパスワードを流用してはならない。7-3d-2のHTTPS化で解消する
+- この設定は暫定であり、7-9で撤去する
+
+---
+
+## 34. DNS の設定（ムームーDNS）
+
+**目的**：`new.ikshowcase.site`が新サーバーを指すようにする。
+
+### ムームーDNSの構造
+
+ムームーDNSには2つの層があり、両方が同時に有効である。
+
+| 区分 | 内容 |
+|---|---|
+| 設定1 | 「この名前を自社のどのサービスに割り当てるか」を選ぶ。IPアドレスは指定できない |
+| 設定2（カスタム設定） | レコードを1本ずつ記述する。外部サービスを使う場合はこちら |
+
+共存することは実測で確認した。apexとwwwのAレコードは設定2に存在し、apexのMXとSPFのTXTは設定2に存在しないが、いずれも実際に引ける。後者は設定1から生成されている。
+
+設定2に既存の3本（Resend用。今回は触っていない）：
+
+| サブドメイン | 種別 | 役割 |
+|---|---|---|
+| resend._domainkey | TXT | DKIMの公開鍵 |
+| send | MX | 配信不能通知の受け取り先 |
+| send | TXT | sendサブドメインのSPF |
+
+### 制約
+
+- TTLは3600秒で固定であり、変更できない
+- 反映には最大1時間かかる（公式の記載）
+- 優先度欄はMXとSRVのみが対象。空欄の場合は自動的に50が入る
+- サブドメイン欄が空欄の場合、apex（ikshowcase.site）のレコードになる
+
+### 追加した行
+
+| サブドメイン | 種別 | 内容 | 優先度 |
+|---|---|---|---|
+| new | A | `<SERVER_IP>` | 空欄 |
+
+### 検証
+
+変更前と変更後で同じコマンドを実行し、照合する。
+
+```bash
+dig +noall +answer @dns01.muumuu-domain.com ikshowcase.site SOA
+dig +noall +answer @dns01.muumuu-domain.com new.ikshowcase.site A
+dig +noall +answer @dns01.muumuu-domain.com ikshowcase.site A
+dig +noall +answer @dns01.muumuu-domain.com ikshowcase.site MX
+dig +noall +answer @dns01.muumuu-domain.com ikshowcase.site TXT
+dig +noall +answer @dns01.muumuu-domain.com www.ikshowcase.site A
+```
+
+変更前の状態（`<LOLIPOP_IP>`はロリポップのIP）：
+
+| 対象 | 値 |
+|---|---|
+| NS | dns01.muumuu-domain.com / dns02.muumuu-domain.com |
+| apex A | `<LOLIPOP_IP>` |
+| apex MX | 50 mx01.lolipop.jp. |
+| apex TXT | v=spf1 include:_spf.lolipop.jp ~all |
+| www A | `<LOLIPOP_IP>` |
+| new A | 存在しない |
+
+変更後：newのAが`<SERVER_IP>`になり、他の4本は一切変化していない。
+
+### 通常の経路での確認（権威サーバーでの確認が済んだ後）
+
+```bash
+dig +noall +answer new.ikshowcase.site A
+curl -s -o /dev/null -w '%{http_code}\n' http://new.ikshowcase.site/
+curl -s -o /dev/null -w '%{http_code}\n' -u '<USER>' http://new.ikshowcase.site/
+```
+
+期待する出力：`<SERVER_IP>`、`401`、`200`
+
+レコードが引けることと、その名前でサーバーに到達できることは別である。権威サーバーへの直接問い合わせは反映の判定に使い、通常の経路でのdigとHTTPの応答で、名前→IP→Nginx→認証という経路全体が通っていることを確認する。反映には最大1時間かかるため、ここで引けない場合は時間をおいて再確認する。
+
+### 判断の理由
+
+- **権威サーバーに直接聞く（`@dns01.muumuu-domain.com`）。** 通常のdigは途中のキャッシュを経由した答えを返す。とくに**「存在しない」という答えもキャッシュされる**（キャッシュされる秒数はSOAレコードの最終フィールド。このzoneでは3600秒）。追加前に通常の経路で引いてしまうと、追加後もその時間だけ見えない可能性がある
+- **反映の判定にはSOAのシリアルを使う。** 管理画面が「保存しました」と表示することと、権威サーバーの答えが変わることは別である。シリアルはUnix時刻であり、変更のたびに更新される
+- **この検証の要点は、足した行が見えることではなく、足していない行が変わっていないことである。** MXとSPFが消えるとメールが停止するため、変更前の状態を先に記録し、後で照合する形にした
+- **自社サービスへの割り当ては設定2で行わないことが推奨されている。** 現状はapexとwwwのAが設定2からロリポップを指しており、この推奨に反している。既存の状態であり今回は触らない
+
+---
+
+## 35. 運用上の注意（恒久的に発生すること）
 
 - 通常更新（`-updates`）は自動適用されない。月1回程度、手動で `apt update && apt upgrade` を実行する必要がある
 - ポートを開けるときはConoHaセキュリティグループとufwの2箇所を見る
@@ -1458,13 +1661,15 @@ php artisan about --only=cache
 - 自動セキュリティ更新が実際に動いたかは、外から試せない。次のコマンドで記録を確認する：`sudo tail -50 /var/log/unattended-upgrades/unattended-upgrades.log`
 - ライブラリ（libcurlなど）が更新されると、needrestartがphp8.5-fpmやnginxを自動で再起動する。サービスの起動時刻が変わっていたら、この可能性を疑う
 - aptで導入したパッケージ（Node.js、Composer、PHP、Nginx）はunattended-upgradesの対象であり、セキュリティ更新でバージョンが自動的に上がる。ビルド成果物の一致を検証した結果は、検証時点のバージョンに対するものであり、更新後も同じとは限らない
+- ログインバナーが表示する更新可能パッケージ数は、生成時点のキャッシュである。実効値は`apt update`の後の`apt list --upgradable`で確認する。実際に、バナーが3件と表示していたときの実数は7件だった
+- grubが更新対象に含まれる場合は、作業者が見ている時間帯に自分で再起動して、起動することを確認する。`/var/run/reboot-required`は「再起動が必要か」を示すが「再起動して問題ないか」は示さない。ブートローダの破損は次の起動まで表面化せず、9節の自動再起動は19:00 UTC（日本時間の午前4時）に無人で走る
 
 ---
 
-## 34. 未実施・保留
+## 36. 未実施・保留
 
 - ESM（Ubuntu Pro）：未有効。標準サポート期間中の追加価値が未確認のため保留 → 解決：7-3c-3で「有効化しない」と判断（32節）
-- 監視：未設定。回収先は7-3dまたは7-10
+- 監視：未設定。回収先は7-3dまたは7-10 → 7-9へ移すと決定。理由：監視が要るのは「落ちて困る状態」になったときであり、7-3dの時点では対象が存在しない。ただし証明書の自動更新の失敗は90日後に沈黙のまま起きるため、その検知手段は7-3d-2の完了条件に含める
 - pm.max_childrenの調整（アプリ配置後に実測して決める） → 解決：7-3c-3で実測のうえ10に変更（26節・27節）
 - opcache.max_accelerated_filesが足りているかの実測 → 解決：7-3c-3の実測で既定値のままでよいと確認（28節）
 - opcache.validate_timestamps = 0の再検討（デプロイ自動化後）
@@ -1472,3 +1677,15 @@ php artisan about --only=cache
 - bootstrap/cacheのグループ書き込み権限を締める（7-3bの設計では「www-dataには読み取り権限だけを与える」としている。サイトが表示されることを確認してから締め、締めた後も動くことを確認するという順序にするため保留している） → 解決：7-3c-3で締めた（29節）
 - デプロイ手順でのumask 027の適用 → 解決していない。7-3c-3では採用せず、「作った後に直す」方式（chgrp / chmod）を選んだ（30節参照）
 - setgidの再帰付与とumask 027によるデプロイ（案B）の検討。`/var/www/portfolio`以下のディレクトリにsetgidを再帰付与すれば、新規ファイルのグループがwww-dataを継承するため、`umask 027`だけで正しい権限になり、デプロイのたびのchgrp / chmodが不要になる。ただしstorageの書き込み権限の扱い、php-fpm側のumask、既存ディレクトリへの一括付与という3つの設計判断を伴うため、7-4のデプロイ自動化と一体で検討する
+
+### 7-3d-1で新たに判明した持ち越し項目
+
+| 項目 | 回収先 |
+|---|---|
+| `/.well-known/acme-challenge/`の置き場所が未確定。現状はserverのroot（`public/`）を継承しており、certbotがここへ書くとリポジトリが汚れる | 7-3d-2 |
+| 443側の受け皿（catch-all）が未設定 | 7-3d-2 |
+| Basic認証のユーザー名がOSのユーザー名（SSHの`AllowUsers`対象）と同一。401はユーザー名を明かさず、SSHはパスワード認証を無効化済みのため実害は小さいが、7-3aでありふれない名前を選んだ判断とは整合しない | 7-9（認証撤去で解消） |
+| pollinateが不要パッケージとして残っている（`apt autoremove`未実施） | 7-3d-1の区切り |
+| Resendのレコードがapexベースで登録されている（`send`と`resend._domainkey`）。引き継ぎ資料の`mail.ikshowcase.site`という記載と一致しない | 7-5 |
+| `new.ikshowcase.site`の廃止方法（レコード削除か、apexへの転送を残すか） | 7-9 |
+| apexの切り替えは、設定2のAの行の内容を書き換えるだけで済む（設定1は触らない） | 7-9 |
