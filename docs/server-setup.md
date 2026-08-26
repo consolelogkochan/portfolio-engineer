@@ -10,6 +10,7 @@
 - 旧サーバー（ロリポップ）のIPアドレス → `<LOLIPOP_IP>`
 - 作業用ユーザー名 → `<USER>`
 - 公開鍵の実体 → `<PUBLIC_KEY>`
+- メールアドレス → `<EMAIL>`
 - パスワード・パスフレーズは本文中に一切記載していません
 
 ホスト名（`portfolio`）や設定の中身そのものは、手順書として機能させるため伏せていません。
@@ -21,7 +22,7 @@
 - ConoHa VPS 3.0 / 2GB / 東京リージョン / Ubuntu 26.04 LTS
 - 料金プラン：まとめトク6ヶ月
   - 理由：クレジットカードの更新時期を契約期間の内側に抱え込み、更新イベントの回数を減らすため
-  - 注意：入金が確認できず契約満了を迎えるとサーバーが削除される（詳細は35節）
+  - 注意：入金が確認できず契約満了を迎えるとサーバーが削除される（詳細は36節）
 
 ### オプションの選択と理由
 
@@ -935,7 +936,14 @@ Composer version 2.9.5
 PHP version 8.5.4 (/usr/bin/php8.5)
 ```
 
-aptを選ぶ理由：unattended-upgradesの自動セキュリティ更新の対象になる。公式インストーラで導入すると更新が手動になる。
+aptを選ぶ理由：36節の月次手動更新（apt upgrade）の対象になる。公式インストーラで導入すると、更新の経路がまったく無くなる。
+
+【訂正（7-3d-2a）】当初この理由を「unattended-upgradesの自動セキュリティ更新の対象になる」と記載していたが、誤りである。
+
+- 実測：`apt-cache policy composer` → resolute/universeから提供されている
+- universeのパッケージは自動セキュリティ更新の対象外である（32節で実測済み）
+- 原因は、一般則（aptなら自動更新される）を個別のケースに確認せず当てはめたこと
+- 判断（aptを使う）自体は維持する。訂正が必要なのは理由の範囲のみ
 
 Composer 1系では本プロジェクトは動かないため、Candidateが1.xの場合は公式インストーラを使う手順に切り替える。
 
@@ -1224,9 +1232,11 @@ server {
     auth_basic_user_file /etc/nginx/.htpasswd;
 
     # 証明書の取得・更新はこの経路を通るため、認証の対象から外す。
-    # 置き場所（root）は 7-3d-2 で取得方式を決めるときに確定する。
+    # 置き場所はリポジトリの外に置く。certbot がここへファイルを書くため、
+    # public/ を継承させるとサーバー上のリポジトリが汚れる。
     location ^~ /.well-known/acme-challenge/ {
         auth_basic off;
+        root /var/www/certbot;
     }
 
     # 静的ファイルが実在すればそれを返し、なければ index.php に渡す
@@ -1248,7 +1258,14 @@ server {
 }
 ```
 
-【依存関係】この設定の`auth_basic`の2行は、33節で作成する`/etc/nginx/.htpasswd`に依存する。上から順に再構築する場合は、33節を先に実施してから本節を適用すること。（`nginx -t`を通過しても、ファイルが存在しなければ実行時にエラーになる。この挙動は未検証であり、確認していない。）
+【前提となる節】本節の設定は次に依存する。上から順に再構築する場合は、これらを先に実施すること。
+
+| 設定 | 依存先 |
+|---|---|
+| `auth_basic_user_file`が参照する`/etc/nginx/.htpasswd` | 33節 |
+| acme-challengeの`root`が指す`/var/www/certbot` | 35節 |
+
+（`nginx -t`を通過しても、これらが存在しなければ実行時にエラーになる可能性がある。この挙動は未検証である。）
 
 `/etc/nginx/sites-available/default-deny`（新設）：
 
@@ -1312,6 +1329,24 @@ curl -s -o /dev/null -w '%{http_code}\n' -u '<USER>' -H 'Host: new.ikshowcase.si
 3つ目の検証（`Host`ヘッダを付けてIPへ直接アクセスする）の意味：DNSを経由せずサーバーを名指しで確かめる手段が残っている。1節でICMPを含めた「観測できる手段を自分から捨てない」と同じ判断である。
 
 名前を経由した経路全体の確認は、DNSの設定が済んだ後に行う必要があるため、34節の検証に置いている。本節の検証は、DNSの状態に関わらずNginxの設定だけを対象とする。
+
+### 暫定設定を元に戻す
+
+14節で`/etc/nginx/sites-available/default`を書き換えたが、これはパッケージが管理している設定ファイルである。`sites-enabled`から外した後は、この内容が使われる経路が無い。元に戻す。
+
+```bash
+sudo cp /etc/nginx/sites-available/default.bak /etc/nginx/sites-available/default
+dpkg -V nginx-common
+sudo rm /etc/nginx/sites-available/default.bak
+```
+
+期待する出力：`dpkg -V`が無出力であること。
+
+### 判断の理由（暫定設定を元に戻す）
+
+- 自分の内容で保持し続けると、`nginx-common`が更新されるたびに上書き確認が出る。5節で「出たら止めて確認する」と決めた事象を、自分で作り続けることになる
+- reloadは不要。`default`は`sites-enabled`にリンクされていないためNginxは読んでいない
+- 検証：`dpkg -V`の無出力は、パッケージが記録している内容と実物が一致したことを意味する。`default.bak`がパッケージ本来の版と一字一句同じだったことの証明でもある（実測で確認済み）
 
 ---
 
@@ -1649,7 +1684,137 @@ curl -s -o /dev/null -w '%{http_code}\n' -u '<USER>' http://new.ikshowcase.site/
 
 ---
 
-## 35. 運用上の注意（恒久的に発生すること）
+## 35. 証明書の取得（Let's Encrypt / certbot）
+
+**目的**：証明書を取得する。Nginxへの適用は行わない。
+
+### 判断：取得と適用を分ける
+
+実測：`sudo certbot plugins`の出力に`nginx`が含まれることを確認した。certbotはNginxの設定を自動で書き換える機能を持つが、使わない。
+
+使うと「証明書を取る」と「HTTPSを有効にする」が1つの操作に融合し、何が起きたかが見えなくなる。1節でスタートアップスクリプトを使わなかった判断、13節でphpメタパッケージを避けた判断と同じ形である。
+
+分けることで安全にもなる。取得に失敗しても、動いているサイトは何も変わらない。
+
+### 判断：certbotはsnapで導入する（aptを使わない）
+
+- 実測：`apt-cache policy certbot` → resolute/universe、Candidateは`4.0.0-4`
+- 実測：snapは導入済み。`systemctl is-active snapd.socket` → `active`、`snap list`が応答する
+
+- 理由1：出典：Ubuntuの Stable Release Updates 方針では、リリース後の更新は限られた状況でのみ行われ、原則としてバグ修正とセキュリティ修正に限られる。ただし特定のパッケージ群には個別の例外規定が存在する（https://ubuntu.com/project/docs/SRU/stable-release-updates）。したがって「絶対に版が上がらない」のではなく、「原則として上がらず、上がる場合は個別の例外として定められている」が正確である。certbotにその例外が適用されているかは確認していない（推測：適用されていないと考えている）。aptで入れると、少なくとも原則の範囲では26.04のサポート期間中4.0.0のままになる
+- 理由2：universeのため、セキュリティ更新も保証されない（32節で実測）
+- 理由3：ACMEの仕様は変化し続けている。出典：証明書の有効期間は2027-02-10に64日、2028-02-16に45日へ短縮予定（https://letsencrypt.org/upcoming-features/）
+
+代償：snapは自動更新されるため、予期しないタイミングで版が上がる。32節・1節の「自動で入るものを増やさない」とは正面からぶつかる。それでもsnapを選んだのは、止まった瞬間にサイトが開けなくなる種類の道具では、「古いまま止まる」ほうが「勝手に新しくなる」より危険だと判断したため。
+
+実測：導入結果はcertbot 5.7.0（aptの4.0.0に対して）
+
+```bash
+sudo snap install core
+sudo snap refresh core
+sudo snap install --classic certbot
+sudo ln -s /snap/bin/certbot /usr/bin/certbot
+certbot --version
+```
+
+- `--classic`：snapは通常、隔離された環境でソフトを動かす。certbotは`/etc/letsencrypt/`に鍵と証明書を書き、Webサーバーの公開ディレクトリにも触るため、隔離を外す指定が要る
+- `ln -s`：snapのコマンドは`/snap/bin/`に置かれる。PATHに含まれない場面があるため、標準の場所から参照できるようにする
+
+### 判断：チャレンジの置き場所はリポジトリの外に置く
+
+出典：https://letsencrypt.org/docs/challenge-types/
+
+HTTP-01チャレンジは、認証局が指定した文字列をWebサーバーに置かせ、外から取りに来る方式である。locationの`root`を差し替えれば、この経路だけ別の場所を見せられる。
+
+- ACMEクライアントが`http://<ドメイン>/.well-known/acme-challenge/<トークン>`にファイルを置き、Let's Encryptのサーバーが複数の場所から複数回取りに来る
+- 80番ポートでしか行えない。任意のポートは指定できない
+- リダイレクトは10段まで追う。`http:`と`https:`のみ受け付ける。HTTPSへリダイレクトした場合、その先の証明書は検証されない
+- ワイルドカード証明書の発行には使えない
+
+3つ目（リダイレクトの追跡）は7-3d-2bに直接関わるため、必ず記載する。80番を443へ転送する設計にしても、この経路は成立する。
+
+「消し忘れないようにする」ではなく「そもそもリポジトリに到達しない」構造にする。25節で`root`を`public/`に置いた判断と同じ形である。
+
+```bash
+sudo mkdir -p /var/www/certbot/.well-known/acme-challenge
+sudo chown -R root:www-data /var/www/certbot
+sudo chmod -R 755 /var/www/certbot
+```
+
+22節の`o=`（その他はアクセス不可）を適用しない。置かれるのは認証局に取りに来てもらう一時ファイルであり、公開されることが前提である。隠す対象がないところに規則を機械的に当てると、certbotがディレクトリを作る際に噛み合わない余地を増やすだけになる。
+
+### 検証：認証局と同じ方法で経路を試す
+
+```bash
+echo ok | sudo tee /var/www/certbot/.well-known/acme-challenge/test > /dev/null
+curl -s -H 'Host: new.ikshowcase.site' http://<SERVER_IP>/.well-known/acme-challenge/test
+curl -s -o /dev/null -w '%{http_code}\n' -H 'Host: new.ikshowcase.site' http://<SERVER_IP>/
+sudo rm /var/www/certbot/.well-known/acme-challenge/test
+curl -s -o /dev/null -w '%{http_code}\n' -H 'Host: new.ikshowcase.site' http://<SERVER_IP>/.well-known/acme-challenge/test
+```
+
+期待する出力：`ok` / `401` / `404`
+
+- 設定を読んで確認するのではなく、実際にファイルを置いて取れるかを見ている
+- 一時ファイルの作成・確認・削除を一続きで行い、消えたことまで確認する（14節・16節と同じ形）
+
+### 取得：本番を消費しない形で先に試す
+
+```bash
+sudo certbot certonly --webroot -w /var/www/certbot -d new.ikshowcase.site --dry-run
+```
+
+期待する出力：`The dry run was successful.`
+
+- 練習用のサーバーに対して同じ手順を最後まで通す。実際の証明書は作られず、本番の上限を消費しない
+- それでいて、チャレンジの経路は本番とまったく同じように試される
+- 出典：https://letsencrypt.org/docs/rate-limits/
+  - 同一の識別子の組に対する発行は7日間で5件まで
+  - 検証の失敗は1時間あたり5件まで
+  - 練習用の環境は大幅に緩い制限を持つ（制限が無いわけではない）
+- 設定を誤ったまま本番で繰り返すと上限に達し、数日待たされる
+
+成功した場合のみ、本番を実行する。
+
+```bash
+sudo certbot certonly --webroot -w /var/www/certbot -d new.ikshowcase.site
+```
+
+メールアドレス（`<EMAIL>`）と規約への同意を聞かれる。練習用と本番はそれぞれ別の口座として扱われるため、両方で聞かれる。
+
+### 確認
+
+```bash
+sudo certbot certificates
+sudo ls -l /etc/letsencrypt/live/new.ikshowcase.site/
+curl -s -o /dev/null -w '%{http_code}\n' -H 'Host: new.ikshowcase.site' http://<SERVER_IP>/
+```
+
+実測結果：
+
+| 項目 | 値 |
+|---|---|
+| certbotの版 | 5.7.0 |
+| 鍵の種類 | ECDSA |
+| 有効期限 | 取得時点から89日 |
+| live/の中身 | 4つのシンボリックリンク。実体はarchive/の`...1.pem` |
+| サイトの応答 | 401（変化なし） |
+
+最後の401が本節の完了条件である。証明書は取得したが、まだ適用していないことの確認になる。
+
+実測：現時点でlive/の4ファイルは、すべて`archive/new.ikshowcase.site/...1.pem`へのシンボリックリンクである。
+
+推測：更新のたびに実体が`2.pem` `3.pem`と増え、リンクだけが最新を指し続けると理解している。このサーバーではまだ更新が発生していないため未確認。初回の更新時に確認すること。Nginxにはリンクの側を書く。
+
+### 運用上の重要な事実
+
+出典：Let's Encryptは、期限切れの警告メールを送るサービスを2025年6月に終了している（https://letsencrypt.org/2025/06/26/expiration-notification-service-has-ended）
+
+したがって、更新に失敗しても認証局は何も知らせない。検知手段は自前で用意する必要がある。
+
+---
+
+## 36. 運用上の注意（恒久的に発生すること）
 
 - 通常更新（`-updates`）は自動適用されない。月1回程度、手動で `apt update && apt upgrade` を実行する必要がある
 - ポートを開けるときはConoHaセキュリティグループとufwの2箇所を見る
@@ -1666,10 +1831,10 @@ curl -s -o /dev/null -w '%{http_code}\n' -u '<USER>' http://new.ikshowcase.site/
 
 ---
 
-## 36. 未実施・保留
+## 37. 未実施・保留
 
 - ESM（Ubuntu Pro）：未有効。標準サポート期間中の追加価値が未確認のため保留 → 解決：7-3c-3で「有効化しない」と判断（32節）
-- 監視の未設定（35節を参照）→ 7-9で対応する。理由：監視が要るのは「落ちて困る状態」になったときであり、7-3dの時点では対象が存在しない。ただし証明書の自動更新の失敗は90日後に沈黙のまま起きるため、その検知手段は7-3d-2の完了条件に含める
+- 監視の未設定（36節を参照）→ 7-9で対応する。理由：監視が要るのは「落ちて困る状態」になったときであり、7-3dの時点では対象が存在しない。ただし証明書の自動更新の失敗は90日後に沈黙のまま起きるため、その検知手段は7-3d-2の完了条件に含める
 - pm.max_childrenの調整（アプリ配置後に実測して決める） → 解決：7-3c-3で実測のうえ10に変更（26節・27節）
 - opcache.max_accelerated_filesが足りているかの実測 → 解決：7-3c-3の実測で既定値のままでよいと確認（28節）
 - opcache.validate_timestamps = 0の再検討（デプロイ自動化後）
@@ -1677,15 +1842,28 @@ curl -s -o /dev/null -w '%{http_code}\n' -u '<USER>' http://new.ikshowcase.site/
 - bootstrap/cacheのグループ書き込み権限を締める（7-3bの設計では「www-dataには読み取り権限だけを与える」としている。サイトが表示されることを確認してから締め、締めた後も動くことを確認するという順序にするため保留している） → 解決：7-3c-3で締めた（29節）
 - デプロイ手順でのumask 027の適用 → 解決していない。7-3c-3では採用せず、「作った後に直す」方式（chgrp / chmod）を選んだ（30節参照）
 - setgidの再帰付与とumask 027によるデプロイ（案B）の検討。`/var/www/portfolio`以下のディレクトリにsetgidを再帰付与すれば、新規ファイルのグループがwww-dataを継承するため、`umask 027`だけで正しい権限になり、デプロイのたびのchgrp / chmodが不要になる。ただしstorageの書き込み権限の扱い、php-fpm側のumask、既存ディレクトリへの一括付与という3つの設計判断を伴うため、7-4のデプロイ自動化と一体で検討する
+- defaultがパッケージ管理下でありながら書き換えられている → 解決：25節末尾で元に戻した
+- default.bakの要否 → 解決：削除した（25節）
 
 ### 7-3d-1で新たに判明した持ち越し項目
 
 | 項目 | 回収先 |
 |---|---|
-| `/.well-known/acme-challenge/`の置き場所が未確定。現状はserverのroot（`public/`）を継承しており、certbotがここへ書くとリポジトリが汚れる | 7-3d-2 |
-| 443側の受け皿（catch-all）が未設定 | 7-3d-2 |
+| `/.well-known/acme-challenge/`の置き場所が未確定。現状はserverのroot（`public/`）を継承しており、certbotがここへ書くとリポジトリが汚れる | 解決：35節で対応（リポジトリ外の専用ディレクトリ`/var/www/certbot`に置いた） |
+| 443側の受け皿（catch-all）が未設定 | 7-3d-2b |
 | Basic認証のユーザー名がOSのユーザー名（SSHの`AllowUsers`対象）と同一。401はユーザー名を明かさず、SSHはパスワード認証を無効化済みのため実害は小さいが、7-3aでありふれない名前を選んだ判断とは整合しない | 7-9（認証撤去で解消） |
 | pollinateが不要パッケージとして残っている（`apt autoremove`未実施） | 7-3d-1の区切り |
 | Resendのレコードがapexベースで登録されている（`send`と`resend._domainkey`）。引き継ぎ資料の`mail.ikshowcase.site`という記載と一致しない | 7-5 |
 | `new.ikshowcase.site`の廃止方法（レコード削除か、apexへの転送を残すか） | 7-9 |
 | apexの切り替えは、設定2のAの行の内容を書き換えるだけで済む（設定1は触らない） | 7-9 |
+
+### 7-3d-2aで新たに判明した持ち越し項目
+
+| 項目 | 回収先 |
+|---|---|
+| live/のリンクが更新時に張り替わる挙動が未確認。初回更新時にarchive/の中身を確認する | 初回の実更新時 |
+| Let's Encryptは期限切れの警告メールを送らない。更新失敗の検知手段を自前で用意する必要がある | 7-3d-2c |
+| 手順書の判断の根拠が検証されていない（Issue登録済み） | 7-4の先頭 |
+| 手順書の実行順序が通しで検証されていない（Issue登録済み） | 7-4の先頭 |
+| 節を追加するたびに節番号の参照を修正する必要がある。番号ではなく名前で参照する形に変えるべきか | 7-4の先頭（上2件と同じカードで扱う） |
+| バックアップの破棄時期が手順書に規定されていない。7-3d-2aでは「取得完了時に削除」と事前に決めて実行した | 7-4の先頭 |
