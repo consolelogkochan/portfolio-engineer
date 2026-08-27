@@ -22,13 +22,13 @@
 - ConoHa VPS 3.0 / 2GB / 東京リージョン / Ubuntu 26.04 LTS
 - 料金プラン：まとめトク6ヶ月
   - 理由：クレジットカードの更新時期を契約期間の内側に抱え込み、更新イベントの回数を減らすため
-  - 注意：入金が確認できず契約満了を迎えるとサーバーが削除される（詳細は36節）
+  - 注意：入金が確認できず契約満了を迎えるとサーバーが削除される（詳細は37節）
 
 ### オプションの選択と理由
 
 | オプション | 選択 | 理由 |
 |---|---|---|
-| 自動バックアップ | 無効 | コード・コンテンツ・画像はすべてgitにあり、DBも無い。サーバー上に復元すべき固有データが存在しないため。※DBを載せる段階で再検討が必要 |
+| 自動バックアップ | 無効 | コード・コンテンツ・画像はすべてgitにあり、DBも無い。サーバー上に復元すべき固有データが存在しないため。※DBを載せる段階で再検討が必要<br><br>【更新（7-3d-2b）】7-3d-2aで`/etc/letsencrypt/`に秘密鍵とアカウント鍵が生成された。「サーバー上に復元すべき固有データが存在しない」は、字義どおりには成り立たなくなっている。<br><br>ただし判断（自動バックアップを無効にする）は維持する。これらはいずれも再生成可能であり、35節の手順を実行すれば証明書を取り直せるため。<br><br>注意：再発行にはレート制限がある（出典：同一の識別子の組に対して7日で5件。https://letsencrypt.org/docs/rate-limits/ ）。サーバーの作り直しを短期間に繰り返すと、証明書を取れずに詰まる可能性がある。 |
 | 追加ストレージ | 使用しない | 標準SSDで十分 |
 | スタートアップスクリプト | 使用しない | 何がどう入ったか分からない状態を避け、自分で1つずつ入れて役割を理解するため |
 
@@ -936,7 +936,7 @@ Composer version 2.9.5
 PHP version 8.5.4 (/usr/bin/php8.5)
 ```
 
-aptを選ぶ理由：36節の月次手動更新（apt upgrade）の対象になる。公式インストーラで導入すると、更新の経路がまったく無くなる。
+aptを選ぶ理由：37節の月次手動更新（apt upgrade）の対象になる。公式インストーラで導入すると、更新の経路がまったく無くなる。
 
 【訂正（7-3d-2a）】当初この理由を「unattended-upgradesの自動セキュリティ更新の対象になる」と記載していたが、誤りである。
 
@@ -1347,6 +1347,8 @@ sudo rm /etc/nginx/sites-available/default.bak
 - 自分の内容で保持し続けると、`nginx-common`が更新されるたびに上書き確認が出る。5節で「出たら止めて確認する」と決めた事象を、自分で作り続けることになる
 - reloadは不要。`default`は`sites-enabled`にリンクされていないためNginxは読んでいない
 - 検証：`dpkg -V`の無出力は、パッケージが記録している内容と実物が一致したことを意味する。`default.bak`がパッケージ本来の版と一字一句同じだったことの証明でもある（実測で確認済み）
+
+この構成は、36節（HTTPSの有効化）で置き換わる。本節の時点では80番でサイトを配信し、36節で80番を転送専用に変え、443番のブロックを追加する。
 
 ---
 
@@ -1814,7 +1816,241 @@ curl -s -o /dev/null -w '%{http_code}\n' -H 'Host: new.ikshowcase.site' http://<
 
 ---
 
-## 36. 運用上の注意（恒久的に発生すること）
+## 36. HTTPS の有効化
+
+**目的**：443番を開き、証明書を適用し、80番を転送専用にする。
+
+### 判断1：80番は「443番への転送」と「証明書の更新の通り道」だけを担う
+
+80番の扱いには2案があった。
+
+(a) 80番に来たものを全部443番へ転送する
+(b) チャレンジだけ80番で受け、それ以外を転送する
+
+どちらでも更新は成立する。認証局はリダイレクトを追い、その先の証明書を検証しないため（35節に記載、出典：https://letsencrypt.org/docs/challenge-types/ ）。
+
+(b)を採る理由は、証明書を直すための道を、証明書に依存させないためである。(a)では更新の経路が443番を通る。443番に問題が起きているときに、その443番を経由して証明書を直すことになる。
+
+3節（SSHを触る前に、SSHを経由しない復旧手段を確認する）と同じ形の判断である。
+
+この経路は無人で、90日に一度しか走らない。失敗しても認証局は通知しない（35節に記載）。依存を1つ減らせるなら減らす。
+
+### 判断2：Basic認証を80番から443番へ移す
+
+80番は転送しかしないため、認証を置く意味がない。置けば、資格情報が暗号化されない経路で送られることになる。
+
+33節に「HTTPS化前は資格情報が経路上を平文で流れる」と記録した問題は、この移動によって解消する。
+
+### 判断3：443番の受け皿は ssl_reject_handshake を使う
+
+80番では`return 444`（応答せず接続を閉じる）としたが、443番では同じ手が使えない。
+
+暗号化の約束は、どの名前宛の要求かが分かるより先に始まる。444を返すには、その前に証明書を提示し終えている必要がある。証明書にはドメイン名が書いてあるため、無関係な相手に名前を渡すことになる。
+
+実害は小さい（その名前は証明書を取った時点でCertificate Transparencyに載っており、隠しきれるものではない）。それでも、応答する理由がない相手のために応答を組み立てないという25節の判断を、443番でも通す。
+
+- 実測：本番のNginxは1.28.3（`nginx -v`）
+- 出典：`ssl_reject_handshake`はNginx 1.19.4以降で使用可能（https://nginx.org/en/docs/http/ngx_http_ssl_module.html ）
+
+### 判断4：TLSの既定値は触らない
+
+- 実測（`nginx -T`）：`ssl_protocols TLSv1.2 TLSv1.3`、`ssl_prefer_server_ciphers off`、`ssl_ciphers`は未設定（Nginxの既定）
+- 古い版（SSLv3 / TLS1.0 / TLS1.1）は既に外れている
+- 実測：有効化後に実際にネゴシエートされたのはTLSv1.3 / TLS_AES_256_GCM_SHA384
+- 出典：TLS 1.3では静的RSAと静的Diffie-Hellmanの暗号方式が削除され、公開鍵に基づく鍵交換はすべて前方秘匿性を提供する。RFC 8446："Static RSA and Diffie-Hellman cipher suites have been removed; all public-key based key exchange mechanisms now provide forward secrecy."（https://datatracker.ietf.org/doc/html/rfc8446 ）
+
+16節（Ubuntuのphp.iniは既に本番向けだった）と同じ形である。変更が必要だろうという想定で始めず、まず実効値を見た結果、触る必要がなかった。
+
+### 判断5：転送は301を使う
+
+出典：仕様上は301も要求の種類と本文を保持することを求めているが、古いクライアントが誤ってGETに変えてしまう実装上の問題がある。308では保持が厳密に保証される。（https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Status/308 ）
+
+それでも301を採るのは、平文の80番にPOSTが来た時点で既に事故だからである。要求の中身は暗号化されずに送られてしまっており、転送先で正しく再送されることに価値がない。
+
+### 判断6：443番を開けるのはufwのみでよい
+
+実測：ConoHaのセキュリティグループ`IPv4v6-Web`は、443番をIPv4・IPv6の両方で許可済み
+
+12節に「ポートを開けるときはConoHaとufwの2箇所を見る」とあるが、今回は片方が既に開いていた。確認したうえで片方だけ触ったという記録である。
+
+### 意図的に入れなかったもの
+
+| 項目 | 理由 |
+|---|---|
+| HTTP/2 | 性能の話であり、このカードの対象ではない。役割を理解しないまま1行足すのは、1節でスタートアップスクリプトを避けた判断と矛盾する。7-3d-4へ |
+| ssl_session_cache | 実測：未設定。これも性能の話のため7-3d-4へ |
+
+### 手順
+
+```bash
+sudo ufw allow 443/tcp
+sudo ufw status verbose
+```
+
+期待する出力：`443/tcp`がIPv4・IPv6の両方に`ALLOW IN`として並び、`22/tcp`は`LIMIT`のままであること。
+
+`/etc/nginx/sites-available/default-deny`を次の内容に置き換える。
+
+```nginx
+# server_name が一致しなかったリクエストの受け皿。
+#
+# 80番：応答を返さずに接続を閉じる。
+server {
+    listen 80 default_server;
+    listen [::]:80 default_server;
+
+    server_name _;
+
+    return 444;
+}
+
+# 443番：80番と同じ手が使えない。
+# 暗号化の約束は、どの名前宛の要求かが分かるより先に始まるため、
+# 444 を返すには、その前に証明書を提示し終えている必要がある。
+# 証明書にはドメイン名が書いてあるので、名前を渡すことになる。
+#
+# ssl_reject_handshake は、暗号化の約束の段階で断るため何も渡さない。
+server {
+    listen 443 ssl default_server;
+    listen [::]:443 ssl default_server;
+
+    server_name _;
+
+    ssl_reject_handshake on;
+}
+```
+
+`/etc/nginx/sites-available/portfolio`を次の内容に置き換える。
+
+```nginx
+# 80番は「443番への転送」と「証明書の更新の通り道」だけを担う。
+#
+# 認証を置かないのは、転送しかしないため。ここに認証を置くと、
+# 資格情報が暗号化されない経路で送られることになる。
+server {
+    listen 80;
+    listen [::]:80;
+
+    server_name new.ikshowcase.site;
+
+    # 証明書の取得・更新はこの経路だけを通る。
+    # 443番を経由させないのは、証明書を直すための道を
+    # 証明書に依存させないため（3節の復旧経路の考え方と同じ）。
+    location ^~ /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
+    # $host を使えるのは server_name が完全一致だからである。
+    # 受け皿のように任意の名前を受けるブロックで $host を使うと、
+    # 相手が名乗った文字列をそのまま転送先に書くことになる。
+    location / {
+        return 301 https://$host$request_uri;
+    }
+}
+
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+
+    server_name new.ikshowcase.site;
+
+    # fullchain.pem はサーバー証明書と中間証明書を連結したもの。
+    # cert.pem を指定すると中間証明書が欠け、一部の環境で検証に失敗する。
+    # いずれも live/ のリンク側を指す（更新のたびに実体が入れ替わるため）。
+    ssl_certificate     /etc/letsencrypt/live/new.ikshowcase.site/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/new.ikshowcase.site/privkey.pem;
+
+    # ドキュメントルートは public/ を指す。
+    # これにより .env / app/ / vendor/ は Nginx から到達できない。
+    root /var/www/portfolio/public;
+    index index.php;
+
+    charset utf-8;
+
+    # Nginx のバージョンをレスポンスヘッダとエラーページから隠す
+    server_tokens off;
+
+    # 公開前の暫定措置。中身が揃い apex へ切り替える 7-9 で外す。
+    auth_basic "Restricted";
+    auth_basic_user_file /etc/nginx/.htpasswd;
+
+    # 静的ファイルが実在すればそれを返し、なければ index.php に渡す
+    location / {
+        try_files $uri $uri/ /index.php?$query_string;
+    }
+
+    # PHP は PHP-FPM に渡す
+    location ~ \.php$ {
+        include snippets/fastcgi-php.conf;
+        fastcgi_pass unix:/run/php/php-fpm.sock;
+    }
+
+    # ドットファイルへのアクセスを拒否する。
+    location ~ /\.(?!well-known).* {
+        deny all;
+    }
+}
+```
+
+```bash
+sudo nginx -t
+sudo systemctl reload nginx
+```
+
+`nginx -t`は証明書のファイルも実際に開く。パスが誤っていればここで止まる。通ってからreloadする。
+
+### 検証
+
+サーバー上（IPv6側）：
+
+```bash
+curl -s -o /dev/null -w '%{http_code}\n' -g 'http://[::1]/'
+curl -sk -o /dev/null -w '%{http_code}\n' -g 'https://[::1]/'
+curl -s -o /dev/null -w '%{http_code}\n' -g -H 'Host: new.ikshowcase.site' 'http://[::1]/'
+```
+
+期待する出力：`000` / `000` / `301`
+
+作業端末から（`<USER>`は実際の値に置き換える）：
+
+```bash
+curl -s -o /dev/null -w '%{http_code}\n' -u '<USER>' https://new.ikshowcase.site/
+curl -s -o /dev/null -w '%{http_code} %{redirect_url}\n' http://new.ikshowcase.site/
+curl -s -o /dev/null -w '%{http_code}\n' -H 'Host: new.ikshowcase.site' http://<SERVER_IP>/.well-known/acme-challenge/test
+curl -s -o /dev/null -w '%{http_code}\n' http://<SERVER_IP>/
+curl -sk -o /dev/null -w '%{http_code}\n' https://<SERVER_IP>/
+```
+
+期待する出力：
+
+| | 期待値 | 意味 |
+|---|---|---|
+| 1 | `200` | httpsでサイトが見える |
+| 2 | `301 https://new.ikshowcase.site/` | 80番が転送している |
+| 3 | `404` | 更新の通り道が生きている（認証を通っていない） |
+| 4 | `000` | 80番の受け皿（444） |
+| 5 | `000` | 443番の受け皿。証明書を出さずに断っている |
+
+証明書の連鎖の確認：
+
+```bash
+echo | openssl s_client -connect new.ikshowcase.site:443 -servername new.ikshowcase.site 2>/dev/null | grep -E 'New,|Verify return code'
+```
+
+期待する出力：
+
+```
+New, TLSv1.3, Cipher is TLS_AES_256_GCM_SHA384
+    Verify return code: 0 (ok)
+```
+
+実測：openssl s_clientの出力で`Verify return code: 0 (ok)`を得た。
+
+推測：opensslは既定で中間証明書を自動取得しないため、この結果は「こちらが中間証明書まで正しく提示できている」ことを示すと理解している。未確認。同様に、ブラウザで表示できることが同じ証明にならない（ブラウザが中間証明書を保持している場合がある）という点も推測である（6-2：「動いている」を証明に使わない）。
+
+---
+
+## 37. 運用上の注意（恒久的に発生すること）
 
 - 通常更新（`-updates`）は自動適用されない。月1回程度、手動で `apt update && apt upgrade` を実行する必要がある
 - ポートを開けるときはConoHaセキュリティグループとufwの2箇所を見る
@@ -1831,10 +2067,10 @@ curl -s -o /dev/null -w '%{http_code}\n' -H 'Host: new.ikshowcase.site' http://<
 
 ---
 
-## 37. 未実施・保留
+## 38. 未実施・保留
 
 - ESM（Ubuntu Pro）：未有効。標準サポート期間中の追加価値が未確認のため保留 → 解決：7-3c-3で「有効化しない」と判断（32節）
-- 監視の未設定（36節を参照）→ 7-9で対応する。理由：監視が要るのは「落ちて困る状態」になったときであり、7-3dの時点では対象が存在しない。ただし証明書の自動更新の失敗は90日後に沈黙のまま起きるため、その検知手段は7-3d-2の完了条件に含める
+- 監視の未設定（37節を参照）→ 7-9で対応する。理由：監視が要るのは「落ちて困る状態」になったときであり、7-3dの時点では対象が存在しない。ただし証明書の自動更新の失敗は90日後に沈黙のまま起きるため、その検知手段は7-3d-2の完了条件に含める
 - pm.max_childrenの調整（アプリ配置後に実測して決める） → 解決：7-3c-3で実測のうえ10に変更（26節・27節）
 - opcache.max_accelerated_filesが足りているかの実測 → 解決：7-3c-3の実測で既定値のままでよいと確認（28節）
 - opcache.validate_timestamps = 0の再検討（デプロイ自動化後）
@@ -1844,13 +2080,14 @@ curl -s -o /dev/null -w '%{http_code}\n' -H 'Host: new.ikshowcase.site' http://<
 - setgidの再帰付与とumask 027によるデプロイ（案B）の検討。`/var/www/portfolio`以下のディレクトリにsetgidを再帰付与すれば、新規ファイルのグループがwww-dataを継承するため、`umask 027`だけで正しい権限になり、デプロイのたびのchgrp / chmodが不要になる。ただしstorageの書き込み権限の扱い、php-fpm側のumask、既存ディレクトリへの一括付与という3つの設計判断を伴うため、7-4のデプロイ自動化と一体で検討する
 - defaultがパッケージ管理下でありながら書き換えられている → 解決：25節末尾で元に戻した
 - default.bakの要否 → 解決：削除した（25節）
+- 1節「サーバー上に復元すべき固有データが存在しない」が成り立たなくなった → 解決：1節で解決（判断は維持、理由を更新）
 
 ### 7-3d-1で新たに判明した持ち越し項目
 
 | 項目 | 回収先 |
 |---|---|
 | `/.well-known/acme-challenge/`の置き場所が未確定。現状はserverのroot（`public/`）を継承しており、certbotがここへ書くとリポジトリが汚れる | 解決：35節で対応（リポジトリ外の専用ディレクトリ`/var/www/certbot`に置いた） |
-| 443側の受け皿（catch-all）が未設定 | 7-3d-2b |
+| 443側の受け皿（catch-all）が未設定 | 解決：36節で解決（`ssl_reject_handshake`） |
 | Basic認証のユーザー名がOSのユーザー名（SSHの`AllowUsers`対象）と同一。401はユーザー名を明かさず、SSHはパスワード認証を無効化済みのため実害は小さいが、7-3aでありふれない名前を選んだ判断とは整合しない | 7-9（認証撤去で解消） |
 | pollinateが不要パッケージとして残っている（`apt autoremove`未実施） | 7-3d-1の区切り |
 | Resendのレコードがapexベースで登録されている（`send`と`resend._domainkey`）。引き継ぎ資料の`mail.ikshowcase.site`という記載と一致しない | 7-5 |
@@ -1867,3 +2104,13 @@ curl -s -o /dev/null -w '%{http_code}\n' -H 'Host: new.ikshowcase.site' http://<
 | 手順書の実行順序が通しで検証されていない（Issue登録済み） | 7-4の先頭 |
 | 節を追加するたびに節番号の参照を修正する必要がある。番号ではなく名前で参照する形に変えるべきか | 7-4の先頭（上2件と同じカードで扱う） |
 | バックアップの破棄時期が手順書に規定されていない。7-3d-2aでは「取得完了時に削除」と事前に決めて実行した | 7-4の先頭 |
+
+### 7-3d-2bで新たに判明した持ち越し項目
+
+| 項目 | 回収先 |
+|---|---|
+| HTTP/2が未設定 | 7-3d-4 |
+| ssl_session_cacheが未設定（実測） | 7-3d-4 |
+| gzipは有効だが`gzip_types`を未確認。既定では対象が限られる可能性がある | 7-3d-4 |
+| 7-9でapexにHSTSを入れる場合、`includeSubDomains`を付けると既存の10本のサブドメイン（すべてロリポップ側）がすべてhttps必須になる。ブラウザ側に残るため取り消せない。10本のhttps対応状況を確認したうえで判断すること | 7-9 |
+| HSTSを入れるかどうかの判断（`new.`では「得るものが小さい」として見送った） | 7-9 |
