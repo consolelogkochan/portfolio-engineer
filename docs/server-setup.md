@@ -22,7 +22,7 @@
 - ConoHa VPS 3.0 / 2GB / 東京リージョン / Ubuntu 26.04 LTS
 - 料金プラン：まとめトク6ヶ月
   - 理由：クレジットカードの更新時期を契約期間の内側に抱え込み、更新イベントの回数を減らすため
-  - 注意：入金が確認できず契約満了を迎えるとサーバーが削除される（詳細は38節）
+  - 注意：入金が確認できず契約満了を迎えるとサーバーが削除される（詳細は39節）
 
 ### オプションの選択と理由
 
@@ -936,7 +936,7 @@ Composer version 2.9.5
 PHP version 8.5.4 (/usr/bin/php8.5)
 ```
 
-aptを選ぶ理由：38節の月次手動更新（apt upgrade）の対象になる。公式インストーラで導入すると、更新の経路がまったく無くなる。
+aptを選ぶ理由：39節の月次手動更新（apt upgrade）の対象になる。公式インストーラで導入すると、更新の経路がまったく無くなる。
 
 【訂正（7-3d-2a）】当初この理由を「unattended-upgradesの自動セキュリティ更新の対象になる」と記載していたが、誤りである。
 
@@ -986,6 +986,8 @@ sed -i 's|^QUEUE_CONNECTION=.*|QUEUE_CONNECTION=sync|' .env
 | DB_CONNECTION | sqlite（変更せず） | どのコードもDBに触れないため。使わない設定が残っている状態である。唯一、明示的に設定しない項目である。DBを使わないため値に意味がなく、変更する根拠もないため |
 
 APP_DEBUG=falseの副作用：エラーの詳細が画面に出なくなるため、問題が起きたときは`storage/logs/laravel.log`を読むことになる。
+
+なおSESSION_SECURE_COOKIEは、本節では設定しない。HTTPSを有効にした後の38節で追加する。本番の.envの全体像を把握する場合は、38節もあわせて参照すること。
 
 ---
 
@@ -1508,6 +1510,7 @@ php artisan about --only=cache
 
 - **`composer install`はconfigキャッシュを破棄する。** 実験で確認済み（`config:cache`実行後に`composer install --no-dev --optimize-autoloader`を流すと`bootstrap/cache/config.php`が消え、`packages.php`と`services.php`は再生成され、`routes-v7.php`は残る）。したがって`composer install`→`config:cache`の順序が必須
 - **権限の再適用は、全ての生成が終わった後にまとめて実行する**
+- **`composer install`を伴わない`config:cache`単独の実行でも、権限の再適用は必要である。** 設定を1行変えるだけの作業でも省略できない。実測の詳細は38節を参照
 - **`find ... -exec chmod g+s`を入れているのは、`chmod -R u=rwX,g=rX,o=`がsetgidを落とす可能性があるため。** 落ちるかどうかは実装依存で未検証だが、明示的に付け直せばどちらでも同じ結果になる。setgidが落ちると、次に`view:cache`を実行したとき`storage/framework/views/`のファイルがグループ`<USER>`で作られ、www-dataから読めなくなる
 - **完了確認は`php artisan about --only=cache`。** `Config` / `Routes` / `Views`が`CACHED`であること（`Events`は`NOT CACHED`でよい）
 
@@ -1599,6 +1602,7 @@ curl -s -o /dev/null -w '%{http_code}\n' \
 - **所有権の設計は22節と同じ。** 所有者は変更する人（root）、グループは読む人（www-data）、その他はアクセス不可。権限の表示を読むのではなく、`sudo -u www-data`で実際に読めるかを試す
 - **`/.well-known/acme-challenge/`の確認は404であること。** 401なら認証がかかったまま、404なら認証を抜けてファイルを探しに行った証拠。「設定に書いた」ではなく「実際に外れている」ことの確認であり、16節の`function_exists()`による確認と同じ考え方
 - **HTTPS化前は、資格情報が経路上を平文で流れる。** したがって他で使用しているパスワードを流用してはならない。7-3d-2のHTTPS化で解消する
+  - この問題は36節で解消される。認証を443番へ移し、80番を転送専用にしたため、資格情報が暗号化されていない経路を流れる経路が消えた
 - この設定は暫定であり、7-9で撤去する
 
 ---
@@ -2106,7 +2110,7 @@ New, TLSv1.3, Cipher is TLS_AES_256_GCM_SHA384
 
 - メールを送る手段がまだ無い（7-5で整える）
 - 外部の監視サービスは依存を増やす（32節でESMを避けた判断と衝突する）
-- したがって、ログイン時の表示と**月次の手動更新（38節）**の両方に載せる
+- したがって、ログイン時の表示と**月次の手動更新（39節）**の両方に載せる
 - 9節で「気づいたら手動で再起動する運用は続かない」と判断したのと同じ思想である。新しい習慣を作らず、既にある動作に乗せる
 
 ### 判断5：検知の仕組みが黙って死ぬ経路を作らない
@@ -2302,7 +2306,154 @@ sudo /etc/update-motd.d/99-cert-expiry
 
 ---
 
-## 38. 運用上の注意（恒久的に発生すること）
+## 38. URL の正規化とアプリ側の整合
+
+**目的**：アプリが外へ宣言する住所を、正規のものに揃える。
+
+### 登場人物と、住所が決まる2つの経路
+
+【経路1：設定から】
+
+```
+.env の APP_URL
+   ↓（config:cache のときに固定される）
+bootstrap/cache/config.php
+   ↓ config('app.url')
+   ├─ PageMetaBuilder   ──> og:url, og:image, canonical
+   ├─ SitemapController ──> sitemap.xml の全 URL
+   └─ robots.txt のルート ──> Sitemap: の行
+```
+
+【経路2：要求から】
+
+```
+ブラウザの要求（Host ヘッダ ＋ HTTPS パラメータ）
+   ↓
+Nginx ──fastcgi_param HTTPS──> PHP
+   ↓ 要求から組み立てる
+   └─ @vite ──> build/assets/*.css, *.js
+```
+
+経路1に乗るものは、すべて外向けの宣言である。見に来た相手によって変わってはいけない。
+経路2に乗るものは、要求ごとに正しい値になればよい。
+
+### 判断1：暗号化の事実は、既に PHP へ伝わっている
+
+- 実測：`/etc/nginx/fastcgi_params`の13行目に`fastcgi_param HTTPS $https if_not_empty;`がある
+- 実測：`@vite`の出力が`https://new.ikshowcase.site/build/assets/...`になっている。PHPがスキームとホストの両方を正しく認識している証拠である
+
+したがってTrustProxiesの導入は不要である。
+
+推測：TrustProxiesは、別の場所にある転送役が`X-Forwarded-*`を付けて渡してくる場合の仕組みだと理解している。未確認。ここではNginxとPHP-FPMが直接つながっており、Nginx自身が暗号化を解いているため、上記の1行が直接の経路になる。
+
+16節（Ubuntuのphp.iniは既に本番向けだった）と同じ形である。変更が必要だろうという想定で始めず、実効値を見た結果、触る必要がなかった。
+
+### 判断2：APP_URLを正規の住所にする
+
+末尾のスラッシュは付けない。PageMetaBuilderもSitemapControllerも`rtrim(..., '/')`で落としているが、落とす処理に頼らず、最初から正しい形で入れる。
+
+### 判断3：SESSION_SECURE_COOKIEを明示する
+
+- 実測：設定しない状態でも、httpsでアクセスするとcookieに`secure`が付いていた
+- 推測：未設定は「無効」ではなく、要求が暗号化された経路で来たかどうかで自動的に決まるという意味だと理解している。未確認
+
+明示する理由は、19節「本番に必要な値は既定値に依存せず、すべて明示的に設定する」に従うためである。
+
+この変更の効果は、現在の構成では観測できない。80番が転送専用であり、Laravelが暗号化されていない経路で応答することがないためである。目的は観測できる変化ではなく、依存を1つ減らすことである。
+
+### 判断4：canonicalをこの段階で実装する
+
+7-9でapexへ切り替えると、apexとnew.の両方で同じ内容にアクセスできる期間が発生する。
+
+- 推測：検索エンジンは、同じ内容を複数のURLで見つけたとき、どちらを本物とするかを自分で判断すると理解している。未確認。その判断がこちらの意図と一致する保証はない
+- IPアドレスと無関係な名前は、25節・36節で応答自体を返さないようにしてある。閉じられるものは既に閉じてある
+- apexとnew.はどちらも閉じられないため、宣言が必要になる
+
+値はog:urlと同じ組み立てとする（スキームとホストはconfig('app.url')、パスは要求から）。config('app.url')に乗せることで、7-9でAPP_URLを変えた時点で自動的に追随し、7-9でのコード変更が不要になる。
+
+13節の「推測で先回りしない」には当たらない。13節は「必要になるかどうか分からないもの」を入れなかった判断であり、今回は必要になることが確定している。
+
+### 手順
+
+```bash
+cd /var/www/portfolio
+sed -i 's|^APP_URL=.*|APP_URL=https://new.ikshowcase.site|' .env
+grep -n '^SESSION_SECURE_COOKIE=' .env || echo 'SESSION_SECURE_COOKIE=true' >> .env
+grep -nE '^(APP_URL|SESSION_SECURE_COOKIE)=' .env
+```
+
+`.env`全体は表示しない。APP_KEYが含まれるため（7-2）。
+
+`sed`の区切り文字に`|`を使うのは、値に`/`が含まれるためである。
+
+```bash
+php artisan config:cache
+```
+
+続けて、30節の権限再適用ブロックを実行する（次項の理由による）。
+
+```bash
+php artisan about --only=environment
+curl -s -u '<USER>' https://new.ikshowcase.site/ | grep -oE 'https?://[a-zA-Z0-9./_-]+' | sort -u
+curl -s -u '<USER>' https://new.ikshowcase.site/robots.txt
+curl -s -u '<USER>' https://new.ikshowcase.site/sitemap.xml | head -5
+```
+
+期待する出力：`http://`で始まるURLが1つも残らないこと。
+
+### 実測：config:cacheは権限を緩める
+
+7-3d-1で推測として記録していた内容が、実測で確認された。
+
+| | `bootstrap/cache/config.php` |
+|---|---|
+| config:cacheの前 | `-rw-r-----`（640） |
+| config:cacheの直後 | `-rw-rw-r--`（664） |
+| 30節の再適用の後 | `-rw-r-----`（640） |
+
+- グループ（www-data）に書き込みが付く。29節で締めた穴が開き直る
+- その他に読みが付く。`o=`の設計に反する
+- `routes-v7.php`は作り直されない（更新日時が変わらない）
+- グループはwww-dataのまま。ディレクトリのsetgidが働いている
+
+実測：原因はサーバーのumaskが0002であることと、ディレクトリにsetgidがあること（30節に記録済み）。
+
+したがって、設定を1行変えるだけの作業にも、30節の権限再適用が必要である。
+
+### canonicalの実装
+
+`app/Services/PageMetaBuilder.php`と`resources/views/app.blade.php`を変更した。既存のテスト（`tests/Feature/PageMetaTest.php`）の共通アサーションに検証を追加しており、全6ページが対象になっている。
+
+既知の制限：クライアント側での画面遷移では、canonicalもog:urlも更新されない（7-2でSSRを採らない判断をしているため）。ただし検索エンジンは各URLを直接取得するため、影響しない。
+
+### 検証
+
+```bash
+curl -s -u '<USER>' https://new.ikshowcase.site/ | grep -iE 'canonical|og:url'
+curl -s -u '<USER>' https://new.ikshowcase.site/about | grep -iE 'canonical|og:url'
+```
+
+期待する出力：
+
+| ページ | canonicalとog:url |
+|---|---|
+| トップ | どちらも`https://new.ikshowcase.site/` |
+| /about | どちらも`https://new.ikshowcase.site/about` |
+
+2つのページを見ることに意味がある。パスだけが変わり、スキームとホストは変わっていないことが、設計の説明ではなく実物として確認できる。
+
+### 30節の手順を初めて通した記録
+
+このカードで、30節のデプロイ手順を省略せずに通した。
+
+- 実測：`npm run build`の成果物のファイル名は変わらなかった（`app-CYEMFStJ.js` / `app-BqLPbuc1.css`）。フロント側を変更していないため。21節で実測した「環境をまたいでも成果物が一致する」の、時間をまたいだ版にあたる
+- 実測：`php artisan about --only=cache`で`Config` / `Routes` / `Views`が`CACHED`
+
+PHPのファイルしか変えていないため`npm ci`は不要に見えるが、省略しなかった。状況ごとに省略を判断し始めると、その判断を毎回正しく行う必要が生まれるためである。
+
+---
+
+## 39. 運用上の注意（恒久的に発生すること）
 
 - 通常更新（`-updates`）は自動適用されない。月1回程度、手動で `apt update && apt upgrade` を実行する必要がある
 - ポートを開けるときはConoHaセキュリティグループとufwの2箇所を見る
@@ -2320,10 +2471,10 @@ sudo /etc/update-motd.d/99-cert-expiry
 
 ---
 
-## 39. 未実施・保留
+## 40. 未実施・保留
 
 - ESM（Ubuntu Pro）：未有効。標準サポート期間中の追加価値が未確認のため保留 → 解決：7-3c-3で「有効化しない」と判断（32節）
-- 監視の未設定（38節を参照）→ 7-9で対応する。理由：監視が要るのは「落ちて困る状態」になったときであり、7-3dの時点では対象が存在しない。ただし証明書の自動更新の失敗は90日後に沈黙のまま起きるため、その検知手段は7-3d-2の完了条件に含める
+- 監視の未設定（39節を参照）→ 7-9で対応する。理由：監視が要るのは「落ちて困る状態」になったときであり、7-3dの時点では対象が存在しない。ただし証明書の自動更新の失敗は90日後に沈黙のまま起きるため、その検知手段は7-3d-2の完了条件に含める
 - pm.max_childrenの調整（アプリ配置後に実測して決める） → 解決：7-3c-3で実測のうえ10に変更（26節・27節）
 - opcache.max_accelerated_filesが足りているかの実測 → 解決：7-3c-3の実測で既定値のままでよいと確認（28節）
 - opcache.validate_timestamps = 0の再検討（デプロイ自動化後）
@@ -2336,6 +2487,10 @@ sudo /etc/update-motd.d/99-cert-expiry
 - 1節「サーバー上に復元すべき固有データが存在しない」が成り立たなくなった → 解決：1節で解決（判断は維持、理由を更新）
 - 証明書の更新が一度も走っていない → 解決：37節で解決。本番で1回実行し、張り替わることを確認した
 - certbotのARI対応が未確認 → 解決：更新設定ファイルで確認した
+- 暗号化された経路であることがPHPに伝わっているか未確認 → 解決：38節で解決（実測。対応不要だった）
+- APP_URLが`http://<SERVER_IP>`のまま → 解決：38節で解決
+- 33節の「平文で流れる」という記述が解消後も残っている → 解決：33節に追記して解決
+- config:cacheが権限を緩めるという推測 → 実測になった（38節・30節）
 
 ### 7-3d-1で新たに判明した持ち越し項目
 
@@ -2379,3 +2534,11 @@ sudo /etc/update-motd.d/99-cert-expiry
 | 古い証明書と秘密鍵がarchive/に残り、自身の期限まで有効なままである | 記録のみ |
 | 検知の閾値20日は、有効期間90日を前提にしている。有効期間が64日になる2027-02-10より前に見直すこと | 2027-02-10まで |
 | 7-5で更新失敗の通知を作る際、certbotの終了コードに紐づけるとhookの失敗を拾えない（実測：hookが失敗しても終了コードは0）。サーバーが提示する証明書を見る形にすること | 7-5 |
+
+### 7-3d-3で新たに判明した持ち越し項目
+
+| 項目 | 回収先 |
+|---|---|
+| SESSION_SECURE_COOKIEを明示したが、現在の構成では効果を観測できない。80番の構成を変えた場合に意味を持つ | 記録のみ |
+| クライアント側の画面遷移ではcanonicalとog:urlが更新されない。検索エンジンには影響しないが、SSRを採用する判断をした場合に再検討する | 記録のみ |
+| 7-9でAPP_URLをapexに変えれば、canonical・og:url・sitemap・robotsがすべて追随する。コード変更は不要 | 7-9 |
