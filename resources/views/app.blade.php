@@ -20,6 +20,9 @@
     <meta property="og:description" content="{{ $pageMeta['description'] }}" />
     <meta property="og:type" content="{{ $pageMeta['ogType'] }}" />
     <meta property="og:url" content="{{ $pageMeta['ogUrl'] }}" />
+    {{-- canonical / og:url はクライアント側の画面遷移では更新されない（7-2でSSRを採らない判断をしているため）。
+         ただし検索エンジンは各URLを直接取得するため、影響しない。 --}}
+    <link rel="canonical" href="{{ $pageMeta['canonical'] }}" />
     <meta property="og:image" content="{{ $pageMeta['ogImage'] }}" />
 
     <meta name="twitter:card" content="summary_large_image" />

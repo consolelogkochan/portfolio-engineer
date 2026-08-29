@@ -42,6 +42,16 @@ class PageMetaTest extends TestCase
         return $m[1];
     }
 
+    /** <link rel="canonical" href="..."> のhrefを取り出す */
+    private function extractCanonical(string $html): ?string
+    {
+        if (! preg_match('/<link\s+rel="canonical"\s+href="([^"]*)"/', $html, $m)) {
+            return null;
+        }
+
+        return $m[1];
+    }
+
     /**
      * 全ページ共通の構造的な検証（存在・空でないこと・title=og:title一致・絶対URL形式・og:type）。
      * 文言の中身までは見ない（文言の検証は呼び出し側で個別に行う）。
@@ -81,6 +91,11 @@ class PageMetaTest extends TestCase
         $appUrl = rtrim((string) config('app.url'), '/');
         $this->assertStringStartsWith($appUrl, (string) $ogUrl, 'og:urlがconfig(app.url)基点の絶対URLになっていない');
         $this->assertMatchesRegularExpression('#^https?://#', (string) $ogImage, 'og:imageが絶対URLになっていない');
+
+        // canonical（7-3d-3）：og:urlと同じ組み立てのため、値が一致することを検証する
+        $canonical = $this->extractCanonical($html);
+        $this->assertNotEmpty($canonical, 'link[rel=canonical]が存在しないか空');
+        $this->assertSame($ogUrl, $canonical, 'canonicalがog:urlと一致しない');
 
         $this->assertSame($expectedOgType, $ogType);
     }

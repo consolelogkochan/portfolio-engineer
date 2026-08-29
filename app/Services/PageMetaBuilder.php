@@ -10,9 +10,13 @@ use Illuminate\Http\Request;
  * ページのtitle/description/OGP/Twitter Card用の値を組み立てる。
  *
  * 責務：ページ識別子（config('page_meta.pages')のキー）と動的な上書き値から、
- * resources/views/app.blade.php へ渡す配列（title/description/ogImage/ogType/ogUrl）を返す。
+ * resources/views/app.blade.php へ渡す配列（title/description/ogImage/ogType/ogUrl/canonical）を返す。
  *
  * 責務外：Markdownの読み込み（ContentRepositoryの責務）、HTMLの出力（Bladeの責務）。
+ *
+ * 【既知の制限】canonical / og:url はクライアント側の画面遷移では更新されない
+ * （7-2でSSRを採らない判断をしているため、初回HTML以降はサーバーを経由しない）。
+ * ただし検索エンジンは各URLを直接取得するため、この制限は影響しない。
  */
 class PageMetaBuilder
 {
@@ -23,7 +27,7 @@ class PageMetaBuilder
      * @param  array{title?: string|null, description?: string, ogImage?: string|null, ogType?: string}  $overrides
      *                                                                                                               動的なページ（作品詳細・ログ詳細・About等）がfrontmatter由来の値で
      *                                                                                                               config上の固定文言を上書きするために使う。
-     * @return array{title: string, description: string, ogImage: string, ogType: string, ogUrl: string}
+     * @return array{title: string, description: string, ogImage: string, ogType: string, ogUrl: string, canonical: string}
      */
     public function build(string $page, array $overrides = []): array
     {
@@ -48,6 +52,17 @@ class PageMetaBuilder
             'ogImage' => $this->absoluteUrl($ogImage ?? (string) config('page_meta.default_og_image')),
             'ogType' => $ogType,
             'ogUrl' => $this->absoluteUrl($this->request->getPathInfo()),
+            // canonical は og:url と同じ組み立てにする（7-3d-3）。
+            //
+            // スキーム・ホストを config('app.url') から取る理由：見に来た相手によって
+            // 宣言が変わってはならない。要求から組み立てると、IPで来た人と名前で来た人とで
+            // 宣言する住所が変わってしまう。
+            // パスを要求（$this->request->getPathInfo()）から取る理由：どのページかは
+            // 要求ごとに変わるべきものだから。
+            //
+            // canonical を config('app.url') に乗せることで、7-9でAPP_URLをapexに変えた
+            // 時点で自動的に追随する（7-9でのコード変更は不要）。
+            'canonical' => $this->absoluteUrl($this->request->getPathInfo()),
         ];
     }
 
