@@ -22,7 +22,7 @@
 - ConoHa VPS 3.0 / 2GB / 東京リージョン / Ubuntu 26.04 LTS
 - 料金プラン：まとめトク6ヶ月
   - 理由：クレジットカードの更新時期を契約期間の内側に抱え込み、更新イベントの回数を減らすため
-  - 注意：入金が確認できず契約満了を迎えるとサーバーが削除される（詳細は39節）
+  - 注意：入金が確認できず契約満了を迎えるとサーバーが削除される（詳細は40節）
 
 ### オプションの選択と理由
 
@@ -936,7 +936,7 @@ Composer version 2.9.5
 PHP version 8.5.4 (/usr/bin/php8.5)
 ```
 
-aptを選ぶ理由：39節の月次手動更新（apt upgrade）の対象になる。公式インストーラで導入すると、更新の経路がまったく無くなる。
+aptを選ぶ理由：40節の月次手動更新（apt upgrade）の対象になる。公式インストーラで導入すると、更新の経路がまったく無くなる。
 
 【訂正（7-3d-2a）】当初この理由を「unattended-upgradesの自動セキュリティ更新の対象になる」と記載していたが、誤りである。
 
@@ -1881,8 +1881,8 @@ curl -s -o /dev/null -w '%{http_code}\n' -H 'Host: new.ikshowcase.site' http://<
 
 | 項目 | 理由 |
 |---|---|
-| HTTP/2 | 性能の話であり、このカードの対象ではない。役割を理解しないまま1行足すのは、1節でスタートアップスクリプトを避けた判断と矛盾する。7-3d-4へ |
-| ssl_session_cache | 実測：未設定。これも性能の話のため7-3d-4へ |
+| HTTP/2 | 性能の話であり、このカードの対象ではない。役割を理解しないまま1行足すのは、1節でスタートアップスクリプトを避けた判断と矛盾する。7-3d-4へ → 解決：39節で導入した |
+| ssl_session_cache | 実測：未設定。これも性能の話のため7-3d-4へ → 解決：39節で導入した |
 
 ### 手順
 
@@ -1964,6 +1964,29 @@ server {
     ssl_certificate     /etc/letsencrypt/live/new.ikshowcase.site/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/new.ikshowcase.site/privkey.pem;
 
+    # HTTP/2、暗号化の約束の再利用、圧縮、セキュリティヘッダの判断・実測は39節を参照。
+    http2 on;
+
+    ssl_session_cache   shared:SSL:10m;
+    ssl_session_timeout 1h;
+
+    gzip_types
+        text/css
+        text/plain
+        text/xml
+        text/javascript
+        application/javascript
+        application/json
+        application/xml
+        image/svg+xml;
+    gzip_vary on;
+    gzip_min_length 256;
+    gzip_comp_level 5;
+
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+    add_header X-Frame-Options "DENY" always;
+
     # ドキュメントルートは public/ を指す。
     # これにより .env / app/ / vendor/ は Nginx から到達できない。
     root /var/www/portfolio/public;
@@ -1977,6 +2000,16 @@ server {
     # 公開前の暫定措置。中身が揃い apex へ切り替える 7-9 で外す。
     auth_basic "Restricted";
     auth_basic_user_file /etc/nginx/.htpasswd;
+
+    # ビルド成果物はファイル名に内容のハッシュを含むため、期限を無限にできる（39節）。
+    # add_header は location に1つでも書くと server 側が継承されないため、
+    # 必要なヘッダをここに書き直している（39節・判断5）。
+    location ^~ /build/ {
+        add_header Cache-Control "public, max-age=31536000, immutable" always;
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+        add_header X-Frame-Options "DENY" always;
+    }
 
     # 静的ファイルが実在すればそれを返し、なければ index.php に渡す
     location / {
@@ -2110,7 +2143,7 @@ New, TLSv1.3, Cipher is TLS_AES_256_GCM_SHA384
 
 - メールを送る手段がまだ無い（7-5で整える）
 - 外部の監視サービスは依存を増やす（32節でESMを避けた判断と衝突する）
-- したがって、ログイン時の表示と**月次の手動更新（39節）**の両方に載せる
+- したがって、ログイン時の表示と**月次の手動更新（40節）**の両方に載せる
 - 9節で「気づいたら手動で再起動する運用は続かない」と判断したのと同じ思想である。新しい習慣を作らず、既にある動作に乗せる
 
 ### 判断5：検知の仕組みが黙って死ぬ経路を作らない
@@ -2453,7 +2486,262 @@ PHPのファイルしか変えていないため`npm ci`は不要に見えるが
 
 ---
 
-## 39. 運用上の注意（恒久的に発生すること）
+## 39. 配信ヘッダ
+
+**目的**：中身は変えず、返し方を整える。
+
+### ブラウザが1ページを表示するまで
+
+【1回目の訪問】
+
+```
+ブラウザ ──① 通信路を開く────────> サーバー
+         ──② 暗号化の約束を交わす──>        ← ここが重い
+         ──③ HTML をください──────>
+         <──── HTML ────────────         ← 圧縮が効く
+              （HTML の中に CSS と JS の在りかが書いてある）
+         ──④ CSS と JS をください──>        ← HTTP/2 が効く
+         <──── CSS と JS ───────         ← 圧縮が効く
+```
+
+【2回目の訪問】
+
+```
+         ──① 通信路を開く────────>
+         ──② 暗号化の約束（短縮版）──>      ← セッション再利用が効く
+         ──③ HTML をください──────>
+         ✗ CSS と JS は要求しない            ← キャッシュが効く
+```
+
+手段は3つあり、効く場所が違う。圧縮は「送るものを小さくする」、キャッシュは「そもそも送らない」、接続の再利用は「送るための下準備を省く」。
+
+### 判断1：圧縮の対象は、実測より少し広く取る
+
+実測：このサイトが返しているContent-Typeは次のとおり。
+
+| 住所 | Content-Type |
+|---|---|
+| / | text/html; charset=utf-8 |
+| CSS | text/css |
+| JS | application/javascript; charset=utf-8 |
+| sitemap | application/xml; charset=UTF-8 |
+| robots | text/plain; charset=UTF-8 |
+| PNG | image/png |
+
+実測に現れていない種別も含めている。理由は代償の非対称性である。
+
+| | 13節（php8.5-intlを入れなかった） | 本節（gzip_typesに足す） |
+|---|---|---|
+| 書きすぎの代償 | ある（更新の対象と攻撃面が増える） | ゼロ（現れない種別を書いても何も起きない） |
+| 書き漏らしの代償 | 明確なエラーが出る | 黙って無圧縮になる |
+
+書きすぎの代償と、書き漏らしの代償が非対称なとき、広いほうに倒す。13節で先回りしなかったのは、代償があったからである。
+
+`application/json`を含めているのは、Inertiaがクライアント側の画面遷移でJSONを受け取るためである（HTMLの応答に`Vary: X-Inertia`が付いていることが根拠）。
+
+画像（`image/png`）は含めない。既に圧縮されており、縮まない。
+
+`text/html`は書かない。
+
+- 実測：`gzip_types`に書いていないのに、HTMLは圧縮された
+- 推測：Nginxは`text/html`を常に対象にすると理解している。未確認
+
+### 判断2：ビルド成果物の期限は無限にする
+
+```
+app-BqLPbuc1.css
+    ─────────
+    この部分はファイルの内容から算出されている（21節で実測）
+```
+
+内容が変われば、名前が変わる。
+
+| | ビルド成果物 | HTML |
+|---|---|---|
+| 住所 | `.../app-BqLPbuc1.css` | `.../about` |
+| 内容が変わったら | 住所も変わる | 住所は変わらない |
+| 古いキャッシュが残っていたら | 参照されなくなるだけ | 古い内容が出続ける |
+
+「絶対に変わらない」と言い切れるのは、名前が内容を保証しているときだけである。
+
+更新の頻度は理由ではない。仮に毎日更新しても、名前が変わる限り期限は無限でよい。
+
+`/images/`には付けない。ファイル名にハッシュが無く、内容が変わっても名前が変わらないため。画像の扱いは7-7で決める。
+
+### 判断3：HTTP/2と、暗号化の約束の再利用
+
+- 実測：設定前はHTTP/1.1、設定後はHTTP/2
+- 実測：暗号化の約束の再利用は働いている（`Reused`を確認）
+- 未確認：`ssl_session_cache`を足したことが再利用の原因かどうか。設定前を測っていない。Nginxは既定で別の方式を持つため、足す前から再開できていた可能性がある
+
+**測り方について（重要な記録）**
+
+実測：`openssl s_client -reconnect`では6回とも`New`になり、`-sess_out`で券を保存してから`-sess_in`で繋ぎ直すと`Reused`になった。測り方によって結果が変わった。
+
+推測：原因は、TLS 1.3では再開に使う券が握手の完了後に届くため、即座に繋ぎ直すと受け取れていないからだと理解している。未確認。
+
+正しい測り方は次のとおり。
+
+```bash
+rm -f /tmp/sess.pem
+sleep 1 | openssl s_client -connect new.ikshowcase.site:443 -servername new.ikshowcase.site -sess_out /tmp/sess.pem >/dev/null 2>&1
+ls -l /tmp/sess.pem
+sleep 1 | openssl s_client -connect new.ikshowcase.site:443 -servername new.ikshowcase.site -sess_in /tmp/sess.pem 2>/dev/null | grep -E '^(New|Reused)'
+rm -f /tmp/sess.pem
+```
+
+`ls -l`で券を受け取れたことを先に確認する。これが無いと、券を受け取れていない場合に「再開できていない」と誤って結論する。
+
+「動いていない」と「測れていない」は別である。測定が失敗しているとき、結果は「動いていない」と同じ顔をする。
+
+### 判断4：セキュリティヘッダは3つ入れる
+
+サーバー側では潰せないものだけを書く。ブラウザの中で起きることは、サーバーからは潰せない。
+
+| ヘッダ | ブラウザへの依頼 |
+|---|---|
+| `X-Content-Type-Options: nosniff` | 中身の種類を推測せず、宣言したとおりに扱ってほしい |
+| `Referrer-Policy: strict-origin-when-cross-origin` | 他サイトへ移るとき、どのページから来たかを詳しく渡さないでほしい |
+| `X-Frame-Options: DENY` | 他のサイトの枠の中に表示しないでほしい |
+
+推測：`add_header`は、既定では成功時の応答（200など）にしか付かないと理解している。未確認。
+
+ただし、この判断はこの事実の真偽に依存しない。`always`を付ける代償はゼロであり、付けない場合の代償は「401に付かないかもしれない」である。判断1（圧縮の対象を広く取る）と同じ非対称の構造であり、広いほうに倒している。
+
+実測：`always`を付けた状態で、401の応答に3つとも付いていることを確認した。
+
+**入れなかったもの**
+
+| | 理由 |
+|---|---|
+| HSTS | 7-9で判断すると決定済み（相手側に残り、取り消せないため） |
+| CSP | 許可を書き漏らすと画面が真っ白になる。許可すべき読み込み先は、実コンテンツと画像が入る7-6・7-7の後でないと確定しない。7-9で判断する |
+| Permissions-Policy | 網羅的に書けず、書き漏らしたものは有効なまま残る。そしてこのサイトはカメラや位置情報を呼ぶコードを持たないため、構造的に起きない。CSPと一緒に7-9で判断する |
+
+### 判断5：add_headerの継承（実測）
+
+実測：locationに`add_header`を1つでも書くと、serverブロックの`add_header`は継承されない。
+
+| /build/の設定 | 返るヘッダ |
+|---|---|
+| Cache-Controlだけを書く | cache-controlのみ。他の3つは消える |
+| 4つとも書く | 4つとも返る |
+
+そして`nginx -t`は、どちらの場合も`test is successful`を返した。
+
+設定としては正しく、しかしヘッダは黙って消える。
+
+したがって、必要なヘッダをlocationにも書き直している。重複するが、黙って消えるよりよい。
+
+### 判断6：robots.txtの圧縮で増える件は、対処しない
+
+実測：
+
+```
+content-type: text/plain; charset=UTF-8
+（content-length の行が無い）
+
+plain: 74 バイト
+gzip:  89 バイト   ← 15 バイト増えた
+```
+
+推測：`gzip_min_length`は応答の`Content-Length`を見て判断するため、長さが事前に分からない応答には効かない。robots.txtはLaravelがその場で作る応答であり、長さが付かない。未確認。
+
+**対処しない理由**
+
+| 対処案 | 代償 |
+|---|---|
+| text/plainを対象から外す | 将来、大きなtext/plainを返すようになったとき黙って無圧縮になる。判断1の方針と逆行する |
+| robots.txt専用の設定を足す | 15バイトのために設定を1つ増やす |
+| 何もしない | 15バイト。robots.txtは稀にしか取得されない |
+
+見つけた問題を直さない判断も、根拠があれば正しい。
+
+text/plainの大きな応答を返すようになったら、再検討する。
+
+### 手順
+
+`/etc/nginx/sites-available/portfolio`の443番のブロックに、次を追加する（設定の全文は36節に反映済み）。
+
+```nginx
+    http2 on;
+
+    ssl_session_cache   shared:SSL:10m;
+    ssl_session_timeout 1h;
+
+    gzip_types
+        text/css
+        text/plain
+        text/xml
+        text/javascript
+        application/javascript
+        application/json
+        application/xml
+        image/svg+xml;
+    gzip_vary on;
+    gzip_min_length 256;
+    gzip_comp_level 5;
+
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+    add_header X-Frame-Options "DENY" always;
+
+    location ^~ /build/ {
+        add_header Cache-Control "public, max-age=31536000, immutable" always;
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+        add_header X-Frame-Options "DENY" always;
+    }
+```
+
+### 検証
+
+```bash
+curl -sI -u '<USER>' -H 'Accept-Encoding: gzip' https://new.ikshowcase.site/
+curl -sI -u '<USER>' -H 'Accept-Encoding: gzip' https://new.ikshowcase.site/build/assets/<ビルド成果物のCSS>
+curl -sI https://new.ikshowcase.site/ | grep -iE 'HTTP/|x-content-type|x-frame|referrer'
+```
+
+| | 期待する出力 |
+|---|---|
+| HTML | `HTTP/2 200`、`content-encoding: gzip`、`vary: Accept-Encoding`、セキュリティヘッダ3つ |
+| CSS | `content-encoding: gzip`、`cache-control: public, max-age=31536000, immutable`、セキュリティヘッダ3つ |
+| 認証なし | `401`でもセキュリティヘッダ3つ |
+
+圧縮の効果：
+
+```bash
+curl -s -u '<USER>' -o /dev/null -w 'plain: %{size_download}\n' https://new.ikshowcase.site/build/assets/<CSS>
+curl -s -u '<USER>' -H 'Accept-Encoding: gzip' -o /dev/null -w 'gzip:  %{size_download}\n' https://new.ikshowcase.site/build/assets/<CSS>
+```
+
+圧縮の対象と対象外：
+
+```bash
+for p in /sitemap.xml /robots.txt /images/og/default.png; do
+  printf '%-30s ' "$p"
+  curl -sI -u '<USER>' -H 'Accept-Encoding: gzip' "https://new.ikshowcase.site$p" | grep -i '^content-encoding' | tr -d '\r' || echo '(圧縮なし)'
+done
+```
+
+PNGが圧縮されないことの確認になる。対象に入れていないためである。
+
+### 実測結果
+
+| 項目 | 値 |
+|---|---|
+| CSSの圧縮 | 58,220 → 12,334バイト（約21%、46KBの削減） |
+| プロトコル | HTTP/1.1 → HTTP/2 |
+| 暗号化の約束の再利用 | 働いている（原因が本節の設定かは未確認） |
+| robots.txt | 74 → 89バイト（増えた） |
+| 401へのヘッダ付与 | 付く（`always`の効果） |
+| /build/のヘッダ | 書き直さなければ消える。書き直せば付く |
+
+このサイトの訪問者は多くが初回である。圧縮による46KBの削減は、そのまま効く。
+
+---
+
+## 40. 運用上の注意（恒久的に発生すること）
 
 - 通常更新（`-updates`）は自動適用されない。月1回程度、手動で `apt update && apt upgrade` を実行する必要がある
 - ポートを開けるときはConoHaセキュリティグループとufwの2箇所を見る
@@ -2471,10 +2759,10 @@ PHPのファイルしか変えていないため`npm ci`は不要に見えるが
 
 ---
 
-## 40. 未実施・保留
+## 41. 未実施・保留
 
 - ESM（Ubuntu Pro）：未有効。標準サポート期間中の追加価値が未確認のため保留 → 解決：7-3c-3で「有効化しない」と判断（32節）
-- 監視の未設定（39節を参照）→ 7-9で対応する。理由：監視が要るのは「落ちて困る状態」になったときであり、7-3dの時点では対象が存在しない。ただし証明書の自動更新の失敗は90日後に沈黙のまま起きるため、その検知手段は7-3d-2の完了条件に含める
+- 監視の未設定（40節を参照）→ 7-9で対応する。理由：監視が要るのは「落ちて困る状態」になったときであり、7-3dの時点では対象が存在しない。ただし証明書の自動更新の失敗は90日後に沈黙のまま起きるため、その検知手段は7-3d-2の完了条件に含める
 - pm.max_childrenの調整（アプリ配置後に実測して決める） → 解決：7-3c-3で実測のうえ10に変更（26節・27節）
 - opcache.max_accelerated_filesが足りているかの実測 → 解決：7-3c-3の実測で既定値のままでよいと確認（28節）
 - opcache.validate_timestamps = 0の再検討（デプロイ自動化後）
@@ -2491,6 +2779,9 @@ PHPのファイルしか変えていないため`npm ci`は不要に見えるが
 - APP_URLが`http://<SERVER_IP>`のまま → 解決：38節で解決
 - 33節の「平文で流れる」という記述が解消後も残っている → 解決：33節に追記して解決
 - config:cacheが権限を緩めるという推測 → 実測になった（38節・30節）
+- HTTP/2が未設定 → 解決：39節で解決
+- ssl_session_cacheが未設定 → 解決：39節で解決
+- gzip_typesを未確認 → 解決：39節で解決
 
 ### 7-3d-1で新たに判明した持ち越し項目
 
@@ -2542,3 +2833,11 @@ PHPのファイルしか変えていないため`npm ci`は不要に見えるが
 | SESSION_SECURE_COOKIEを明示したが、現在の構成では効果を観測できない。80番の構成を変えた場合に意味を持つ | 記録のみ |
 | クライアント側の画面遷移ではcanonicalとog:urlが更新されない。検索エンジンには影響しないが、SSRを採用する判断をした場合に再検討する | 記録のみ |
 | 7-9でAPP_URLをapexに変えれば、canonical・og:url・sitemap・robotsがすべて追随する。コード変更は不要 | 7-9 |
+
+### 7-3d-4で新たに判明した持ち越し項目
+
+| 項目 | 回収先 |
+|---|---|
+| CSPとPermissions-Policyが未設定。実コンテンツと画像が入った後でないと、許可すべき読み込み先が確定しない | 7-9 |
+| robots.txtが圧縮によって74→89バイトに増える。実害が小さいため対処しない。text/plainの大きな応答を返すようになったら再検討する | 記録のみ |
+| ssl_session_cacheを足したことが、暗号化の約束の再利用の原因かどうか未確認（設定前を測っていない） | 記録のみ |
