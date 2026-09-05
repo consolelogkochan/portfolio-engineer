@@ -881,6 +881,43 @@ EOF
 
 【7-5への影響】`proc_open` を無効化したため、`MAIL_MAILER=sendmail` は使えない。Resendは SMTP または HTTP API を使うため問題ないが、送信方式を決める際の制約になる。
 
+### 判断：php-fpm の umask を 0007 にする
+
+php-fpm が実行時に作るファイル（ログ・セッション・キャッシュ）の権限は、php-fpm プロセスの umask で決まる。デプロイのプロセス（`<USER>`）の umask とは別物である。
+
+実測（2026-09-04）：変更前は systemd の `UMask=0022` が実効値だった。確認は `/proc/<pid>/status` の `Umask` 行で行う。
+
+```bash
+sudo grep Umask /proc/$(pgrep -f 'php-fpm: pool www' | head -1)/status
+```
+
+この値のもとでは、www-data が作るファイルが 644 になり、その他のユーザーに読み取り権が付く。22節の `o=`（その他はアクセス不可）という設計に反する。従来はデプロイのたびの `chmod -R` が締め直していたが、それは「デプロイの間だけ達成され、次のデプロイまで崩れている」状態である。
+
+設定：
+
+```bash
+sudo mkdir -p /etc/systemd/system/php8.5-fpm.service.d
+sudo tee /etc/systemd/system/php8.5-fpm.service.d/10-umask.conf > /dev/null <<'EOF'
+[Service]
+UMask=0007
+EOF
+sudo systemctl daemon-reload
+sudo systemctl restart php8.5-fpm
+```
+
+reload ではなく restart が要る。UMask はプロセスの起動時に決まるため。
+
+配布元のファイルを編集せず drop-in に集約するのは、7節（sshd）・9節（APT）・本節の conf.d と同じ形である。
+
+実測（2026-09-04）：新しいセッションIDのファイルで効果を確認した。
+
+| | 権限 |
+|---|---|
+| 変更前 | `-rw-r--r--`（644 = `0666 & ~0022`） |
+| 変更後 | `-rw-rw----`（660 = `0666 & ~0007`） |
+
+注意：`file_put_contents` は既存ファイルの権限を変えない。同じセッションIDに上書きしても更新日時しか変わらないため、新しいセッションIDを作らないと umask の効果は測れない。Cookie を保存しない curl が新しいIDを作る。
+
 ### 判断：open_basedirは設定しない
 
 open_basedirはPHPからのあらゆるファイル操作の範囲を制限する設定であり、防御としての効果はある。しかし採用しない。
@@ -1033,6 +1070,12 @@ sed -i 's|^QUEUE_CONNECTION=.*|QUEUE_CONNECTION=sync|' .env
 
 APP_DEBUG=falseの副作用：エラーの詳細が画面に出なくなるため、問題が起きたときは`storage/logs/laravel.log`を読むことになる。
 
+注意：`storage/logs/laravel.log` は www-data が所有し、php-fpm の umask に従って 660 で作られる（16節）。`<USER>` は www-data グループに属していないため（30節の実測）、sudo なしでは読めない。
+
+```bash
+sudo tail -50 /var/www/portfolio/storage/logs/laravel.log
+```
+
 なおSESSION_SECURE_COOKIEは、本節では設定しない。HTTPSを有効にした後の38節で追加する。本番の.envの全体像を把握する場合は、38節もあわせて参照すること。
 
 ---
@@ -1177,7 +1220,7 @@ cd /var/www/portfolio
 sudo chown -R <USER>:www-data .
 sudo chmod -R u=rwX,g=rX,o= .
 sudo chmod -R u=rwX,g=rwX,o= storage bootstrap/cache
-sudo find storage bootstrap/cache -type d -exec chmod g+s {} \;
+sudo find . -type d -exec chmod g+s {} +
 ```
 
 | 操作 | 内容 |
@@ -1185,13 +1228,21 @@ sudo find storage bootstrap/cache -type d -exec chmod g+s {} \;
 | chown | 所有者は`<USER>`（デプロイする人）、グループはwww-data（実行する人） |
 | 1つ目のchmod | 所有者は読み書き、グループは読み取りのみ、その他は一切アクセス不可 |
 | 2つ目のchmod | storageとbootstrap/cacheのみグループにも書き込みを許可 |
-| find + g+s | この2つにsetgidを付ける |
+| find + g+s | 全ディレクトリに setgid を付ける |
 
 大文字のXを使う理由：ディレクトリには中を辿るための実行権限が必要だが、通常のファイルには不要である。Xは「ディレクトリ、または既に実行権限があるファイル」にのみ実行権を付けるため、artisanなどを壊さない。
 
 o=（その他は権限なし）にする理由：644にすると.envが誰でも読める。www-dataはグループとして読めるため、これで十分である。
 
 setgidを付ける理由：このディレクトリに新しく作られるファイルが自動的にwww-dataグループになる。`<USER>`がstorageに書いたときにグループが`<USER>`になるとwww-dataが読めなくなる。
+
+setgid を全ディレクトリに付ける理由：デプロイで新しく作られるファイルのグループが www-data を継承するようにするため。付けないと、作成者（`<USER>`）のプライマリグループである `<USER>` になり、www-data が読めなくなる。デプロイのたびに chgrp で直す方式（30節の旧手順）を不要にするための前提である。
+
+実測（2026-09-04）：対象は 2003 ディレクトリ。付与後に touch で作ったファイルのグループが www-data になることを確認した。
+
+実測（2026-09-04）：setgid は新しいディレクトリへ継承される。`storage/framework/cache/data/` 配下に www-data が実行時に作ったディレクトリ（`4c`、`fa`）が `drwxrws---` で setgid を持っていた。一度付ければ、以後デプロイで作られるディレクトリにも自動的に付く。
+
+`-exec ... +` を使う理由：`\;` は見つかったパスごとに `chmod` を起動する。`+` はまとめて渡すため、2003 件でも起動が数回で済む（出典：find(1)）。
 
 ### 検証（権限の表示を読むのではなく、実際に試す）
 
@@ -1247,6 +1298,24 @@ bootstrap/cacheにはグループ（www-data）の書き込み権限が残って
 これは「実行ユーザーとファイル所有権の設計」の節で「残るリスク」として挙げたものと同じである。
 
 対処：デプロイ時に`<USER>`がキャッシュを生成し、www-dataには読み取り権限だけを与える。サイトの表示を確認した後に適用する（未実施・保留の節を参照）。
+
+【7-4b で方式を変更】この節は「chmod で締め直す」ことを前提に書かれている。7-4b で、全ディレクトリへの setgid 再帰付与（22節）とデプロイ時の umask 027（30節）により、新規ファイルが最初から 640 / 750・グループ www-data で作られるようになった。締め直す作業そのものが不要になっている。
+
+この節が説明する性質（chmod は既存にしか効かない）は変わらない。変わったのは、その性質への対処の仕方である。
+
+mode を渡す経路が2つあることにも注意が要る（実測）。umask から権限を予測するには、プログラムが渡す mode を知る必要がある。Laravel は場所によって 0666 と 0777 を使い分けている。
+
+実測（2026-09-04）：同じ `bootstrap/cache` の中で権限が2種類に分かれる。
+
+| ファイル | 渡す mode | umask 0002 | umask 027 |
+|---|---|---|---|
+| config.php（config:cache） | 0666 | 664 | 640 |
+| routes-v7.php（route:cache） | 0666 | 664 | 640 |
+| packages.php（package:discover） | 0777 | 775 | 750 |
+| services.php（同上） | 0777 | 775 | 750 |
+| storage/framework/views/*.php（view:cache） | 0777 | 775 | 750 |
+
+確認方法：`view:clear` と `view:cache` を実行し、生成直後の権限を見た（`-rwxrwxr-x` = 775 = `0777 & ~0002`）。
 
 ---
 
@@ -1500,6 +1569,19 @@ sudo chmod g-w,o-rwx /var/www/portfolio/bootstrap/cache/.gitignore
 
 30節（更新時のデプロイ手順）には、生成後に一括で権限を再適用する方式（`chgrp` / `chmod`）を記載した。
 
+【7-4b で chmod が不要になった】この節は chmod で bootstrap/cache のグループ書き込みを落としている。7-4b の案B適用により、config.php と routes-v7.php は最初から 640 で作られるようになった。
+
+実測（2026-09-04）：sudo を使わないデプロイの後、bootstrap/cache は次の状態だった。
+
+```
+-rw-r----- <USER> www-data  config.php
+-rwxr-x--- <USER> www-data  packages.php
+-rw-r----- <USER> www-data  routes-v7.php
+-rwxr-x--- <USER> www-data  services.php
+```
+
+この節が締めた状態（グループは読めるが書けない）が、chmod なしで達成されている。
+
 ---
 
 ## 30. 更新時のデプロイ手順
@@ -1537,34 +1619,59 @@ sudo chmod g-w,o-rwx /var/www/portfolio/bootstrap/cache/.gitignore
 - **必要な権限は対象ごとに異なる。** `vendor/`はwww-dataが読めなければならず、`bootstrap/cache`は書かせてはならず、`storage/`は書けなければならない。一律のumaskではこれを表現できない
 - 「最後に必ず全体へ再適用する」なら、対象を列挙し忘れる経路が構造的に存在しない
 
+【7-4b で方針を変更】上の判断は、setgid が storage と bootstrap/cache にしか付いていないことを前提にしていた。新規ファイルのグループが `<USER>` になるため、`umask 027` では www-data が `vendor/` を読めなくなり、本番が停止する。
+
+7-4b で、全ディレクトリに setgid を再帰付与した（22節）。グループが www-data を継承するようになったため、`umask 027` でも www-data は読める。「作る側を変える」が成立する前提が、ここで整った。
+
+実測（2026-09-04）：上の手順を sudo なしで実行し、次を確認した。
+
+- トップと `/about` が 200
+- nginx が `public/build/assets/` の CSS を直接返す経路も 200
+- bootstrap/cache が 640 / 750、グループ www-data
+- `public/build/` 配下の34ファイルが 640、グループ www-data
+- node_modules（`npm ci` が丸ごと再作成）が `drwxr-s---`
+- laravel.log にエラーが増えていない
+- `php artisan about --only=cache` で Config / Routes / Views が CACHED
+
+未検証：`umask 027` のもとで composer が新しいファイルを作る場面。このデプロイでは依存が変わらず、composer は `vendor/` を書き直さなかった（`autoload_real.php` の更新日時が変わっていない）。次に依存が変わるデプロイで確認する。誤っていれば www-data が `vendor/` を読めず、サイトが500になる。31節と同じ系統の壊れ方（vendor/ が原因の500）だが、原因は異なる。31節は依存パッケージの欠落であり、ここで想定しているのは権限の誤りである。失敗が静かではないため、先に確かめる必要はないと判断した。
+
+なぜ chgrp を無くしたいのか（この判断の理由）：現状の権限再適用は sudo を必要とする。7-4d で CI からデプロイする際、sudo を持つ資格情報を CI に置くことになり、その鍵が漏れれば root が取れる。15節が PHP-FPM を `<USER>` 権限で動かさないと判断した理由（sudo グループ経由で root まで届く）と、同じ連鎖である。
+
+したがって案Bの価値は 7-4d に依存している。CI からデプロイしない判断をするなら、案Bを行う理由は無い。現状の方式（作った後に直す）自体に欠陥は無く、変える理由は sudo の1点だけである。
+
+この手順は 7-4b の段階2でスクリプト化する予定である。
+
 ### 手順
 
 ```bash
-cd /var/www/portfolio
-git pull
-composer install --no-dev --optimize-autoloader --no-interaction
-npm ci
-npm run build
-php artisan config:cache
-php artisan route:cache
-php artisan view:cache
-sudo chgrp -R www-data /var/www/portfolio
-sudo chmod -R u=rwX,g=rX,o= /var/www/portfolio
-sudo chmod -R g+w /var/www/portfolio/storage
-sudo find /var/www/portfolio/storage /var/www/portfolio/bootstrap/cache -type d -exec chmod g+s {} \;
+cd /var/www/portfolio && (umask 027 && \
+  git pull && \
+  composer install --no-dev --optimize-autoloader --no-interaction && \
+  npm ci && \
+  npm run build && \
+  php artisan config:cache && \
+  php artisan route:cache && \
+  php artisan view:cache)
 php artisan about --only=cache
 ```
+
+丸括弧でサブシェルにする理由：`umask 027` がこの中だけで有効になり、外のシェルの umask（0002）は変わらない。デプロイの後に同じセッションで別の作業をしても影響が残らない。`&&` でつないでいるため、どれか1つが失敗すればそこで止まる。
 
 ### 判断の理由
 
 - **`composer install`はconfigキャッシュを破棄する。** 実験で確認済み（`config:cache`実行後に`composer install --no-dev --optimize-autoloader`を流すと`bootstrap/cache/config.php`が消え、`packages.php`と`services.php`は再生成され、`routes-v7.php`は残る）。したがって`composer install`→`config:cache`の順序が必須
 - **忘れたときの現れ方が、`config.php`と`routes-v7.php`で違う。** `config.php`は`composer install`で消えるため、`config:cache`を忘れると設定が効かず、変化として気づける。一方`routes-v7.php`は残るため、ルート定義を変更しても`route:cache`を忘れると、古いルートが正常に応答し続ける。誤りが動作として現れない
+
+【以下は 7-4b より前の方式（権限再適用ブロック）についての記録である。現在の手順には含まれない。】
+
 - **権限の再適用は、全ての生成が終わった後にまとめて実行する**
 - **`composer install`を伴わない`config:cache`単独の実行でも、権限の再適用は必要である。** 設定を1行変えるだけの作業でも省略できない。実測の詳細は38節を参照
 - **`find ... -exec chmod g+s`を入れているのは、`chmod -R u=rwX,g=rX,o=`がsetgidを落とす可能性があるため。** 落ちるかどうかは実装依存で未検証だが、明示的に付け直せばどちらでも同じ結果になる。setgidが落ちると、次に`view:cache`を実行したとき`storage/framework/views/`のファイルがグループ`<USER>`で作られ、www-dataから読めなくなる
 - **完了確認は`php artisan about --only=cache`。** `Config` / `Routes` / `Views`が`CACHED`であること（`Events`は`NOT CACHED`でよい）
 
 `npm ci` / `npm run build`は7-4eでCIビルドへ移行する判断を予定しているため、その時点でこの手順から外れる可能性がある。
+
+【以下は 7-4b より前の方式（権限再適用ブロック）についての記録である。現在の手順には含まれない。】
 
 この権限再適用ブロックは2026-08-23に実機で実行し、以下を確認済み。
 
@@ -2836,11 +2943,13 @@ PNGが圧縮されないことの確認になる。対象に入れていない�
 
 | 維持依存 | 失われる契機 | 回復する手順 |
 | --- | --- | --- |
-| 22・23・29・38節 → 30節 | デプロイのたび。ファイルの新規作成（`git pull` / `composer install` / `npm ci` / `npm run build`）とキャッシュの再生成（`config:cache` / `route:cache` / `view:cache`） | 30節の権限再適用ブロックとキャッシュ生成 |
+| 19・23節 → 30節 | デプロイのたび。`composer install` が `bootstrap/cache/config.php` を削除する。`route:cache` を忘れると、`routes-v7.php` は残るため古いルートを黙って配信し続ける | 30節のキャッシュ生成（`config:cache` / `route:cache` / `view:cache`） |
 | 35・36節 → 37節 | certbotの自動更新（約60日ごと）。Nginxは起動時とreload時にしか証明書を読まない（37節・推測）ため、更新後も古い証明書を提示し続ける | 37節のdeploy hook（自動で走る） |
-| 21節 → （回復手順なし） | Nodeとnpmの版が上がる（aptの自動更新、CIの`setup-node`）。ビルド成果物が環境をまたいで一致するという実測が成り立たなくなる | 無い。7-4eでCIビルドへ移行すると、ビルドを行う場所が1つになるため、この要件そのものが消える |
+| 21節 → （回復手順なし） | Nodeとnpmの版が上がる（aptの自動更新、CIの`setup-node`）。ビルド成果物が環境をまたいで一致するという実測が成り立たなくなる | 無い。7-4eでCIビルドへ移行すると、ビルドを行う場所が1つになるため、この要件そのものが消える。実測（2026-09-04）：`app-CYEMFStJ.js` 416,091バイト、`app-BqLPbuc1.css` 58,220バイト。21節が8月に記録した値と一致しており、この時点ではまだ劣化していない |
 | 16節 → （手動確認） | PHPのメジャーバージョンアップ。Nginxが指す`/run/php/php-fpm.sock`（alternatives経由）と、PHP-FPMが待ち受ける`/run/php/php8.5-fpm.sock`（バージョン固定）がずれる | 手動確認（この節の「定期的に発生するもの」に記載） |
 | 16節 →（条件付き。未発生） | `opcache.validate_timestamps`を0に変更した場合、デプロイのたびにPHP-FPMのreloadが必須になる | 現状は既定の1のため発生していない |
+
+22・29・38節 → 30節（権限）の3本は、7-4b で解消した。案Bにより、権限が作られる時点で満たされるようになり、維持する必要そのものが無くなった（自動化ではなく消滅）。
 
 この索引は、節を追加・変更したときに手で直す必要がある。索引そのものが維持依存を持っている。
 
@@ -2860,34 +2969,7 @@ PNGが圧縮されないことの確認になる。対象に入れていない�
 
 ---
 
-### 41-2. 7-4b・7-4f で回収する
-
-**デプロイ時の権限付与の方式（案B の検討）**
-
-現状は「作った後に直す」方式（`chgrp` / `chmod`）を採っている（30節）。7-3c-3 では `umask 027` をデプロイ手順に適用する案を検討したうえで採用しなかった。
-
-案B は、`/var/www/portfolio` 以下のディレクトリに setgid を再帰付与し、新規エントリのグループが `www-data` を継承するようにするもの。これにより、デプロイのたびの `chgrp` が不要になる。
-
-出典：ディレクトリに set-group-ID ビット（setgid）が付いている場合、その中に作られた新規ファイル・ディレクトリのグループは、作成者の実効グループではなく親ディレクトリのグループを継承する（`inode(7)` の "The set-group-ID bit (S_ISGID)" の項。https://man7.org/linux/man-pages/man7/inode.7.html ）
-
-出典：umask は open(2) / mkdir(2) の mode 引数から mask のビットを落とす（`umask(2)`。https://man7.org/linux/man-pages/man2/umask.2.html ）。ただし条件が付く。open(2) は "in the absence of a default ACL, the mode of the created file is (mode & ~umask)"、mkdir(2) は "in the absence of a default ACL, the mode of the created directory is (mode & ~umask & 0777)" とする（man7.org の open(2) / mkdir(2)）。したがって、デフォルト ACL が設定されていない場合に限り、`umask 027` のもとで mode 0666 は 0640 に、mode 0777 は 0750 になる。**グループ書き込みは付かない。**
-
-注意：`/var/www/portfolio` 以下にデフォルト ACL が設定されている場合、上の計算は成り立たない。案B（setgid + umask 027）を設計する 7-4b で、`getfacl` による確認を先に行うこと。
-
-推測：0666 / 0777 という mode を渡しているのは、`touch` や `mkdir(1)`、シェルのリダイレクトなど作成する側のプログラムであり、`umask(2)` 本体ではない。一次出典（GNU coreutils / POSIX）は確認していない。7-4b で案B を設計する際に必要なのは結果の権限値であり、この帰属は判断を変えないため検証しない（6-4）。
-
-推測（未検証）：したがって「`umask 027` だけで正しい権限になる」は、そのままでは成り立たない。`www-data` による書き込みを要するパス（`storage` など）には、別の umask か個別の権限付与が要る。どのパスにグループ書き込みが必要かは、29節・30節の現状と突き合わせて 7-4b で確定する。
-
-**判断を伴う点が3つある**ため、デプロイの自動化と一体で検討する。
-
-1. `storage` の書き込み権限の扱い
-2. php-fpm 側の umask
-3. 既存ディレクトリへの一括付与
-
-**案B の設計で確定させること（7-4b）**
-
-- デフォルト ACL の有無を `getfacl` で先に確認する（上の注意）。ACL があると `mode & ~umask` の計算が崩れ、案B の前提が成り立たない。
-- 案B が消せるのは、30節への維持依存（40節・維持依存の索引）のうち権限に関する3本（22節・29節・38節）だけである。4本目（19節・23節 → 30節、キャッシュが `.env` とコードに追随しない）は権限と無関係で、案B では消えない。デプロイスクリプトが別途要る。
+### 41-2. 7-4f で回収する
 
 **`opcache.validate_timestamps = 0` の再検討（7-4f）**
 
@@ -3030,3 +3112,4 @@ CSP は引き続き 7-9 で判断する（41-5 を参照）。
 | バックアップの破棄時期が手順書に規定されていない | 7-4a-2 で冒頭に規定を追加（変更の検証が通った時点で削除する）。27節に削除の手順を追記した |
 | pollinate が不要パッケージとして残っているか未確認 | 7-4a-2 で確認。実測（2026-09-03）：`dpkg -l pollinate` が `rc`（パッケージ本体は削除済み、設定ファイルのみ残存）を返し、`sudo apt autoremove --dry-run` の削除候補は 0件だった。`sudo apt purge pollinate` を実行し、`dpkg -l` が該当なしを返すことを確認した。なお `apt purge` の後も `/etc/pollinate/add-user-agent` が残った。どのパッケージにも属さず（`dpkg -S` で確認）、Ubuntu のインストーラ（curtin / subiquity）が書いたものだったため、ディレクトリごと削除した。パッケージ管理が消せるのは、パッケージが配置したものだけである |
 | 節どうしの関係が「前提」と「言及」の2種類しか意識されていなかった | 7-4a-2 で「維持依存」を第3の種類として定義し、冒頭に記載、一覧を40節に置いた |
+| デプロイ時の権限付与の方式（案B） | 7-4b で適用した。全ディレクトリへの setgid 再帰付与（22節）とデプロイ時の umask 027（30節）により、権限の再適用が不要になった。3つの判断点はいずれも解決：(1) storage は特別な扱いが不要（デプロイは storage にディレクトリを作らず、既存の 770 に書くだけ。www-data が作るものは php-fpm の umask の管轄）、(2) php-fpm の umask は 0007 にした（16節）、(3) setgid の一括付与は一度きり sudo で行い、以後は継承に任せる |
