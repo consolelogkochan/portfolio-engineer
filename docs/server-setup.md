@@ -1644,18 +1644,70 @@ sudo chmod g-w,o-rwx /var/www/portfolio/bootstrap/cache/.gitignore
 ### 手順
 
 ```bash
-cd /var/www/portfolio && (umask 027 && \
-  git pull && \
-  composer install --no-dev --optimize-autoloader --no-interaction && \
-  npm ci && \
-  npm run build && \
-  php artisan config:cache && \
-  php artisan route:cache && \
-  php artisan view:cache)
-php artisan about --only=cache
+cd /var/www/portfolio
+./bin/deploy.sh
 ```
 
-丸括弧でサブシェルにする理由：`umask 027` がこの中だけで有効になり、外のシェルの umask（0002）は変わらない。デプロイの後に同じセッションで別の作業をしても影響が残らない。`&&` でつないでいるため、どれか1つが失敗すればそこで止まる。
+スクリプトが行うこと（順に）
+
+1. 作業ツリーがクリーンであることを確認する
+2. `git pull --ff-only`
+3. `composer install`（`--no-dev --optimize-autoloader`）
+4. `npm ci`
+5. `npm run build`
+6. `config:cache` / `route:cache` / `view:cache`
+7. Config / Routes / Views の3つが CACHED であることを確認する
+
+権限の再適用は行わない。umask 027 と setgid（22節）により、作られる時点で満たされるためである。sudo は1つも使わない。
+
+この一覧は `bin/deploy.sh` と同じ内容を2箇所に持っている。スクリプトを変更したときは、この一覧も直す必要がある（40節の維持依存の索引に記載）。
+
+コマンド列そのものは文書に残さない。同じ手順を文書とスクリプトの2箇所に置くと、片方だけが古くなる（冒頭の「参照の書き方」と同じ考え方）。中身は `bin/deploy.sh` を参照。
+
+### スクリプトの設計判断
+
+**失敗の判定が、人の目から終了コードへ移る。**
+
+手で流すときは、人が画面を見て各工程の結果を判断していた。スクリプトにすると、判断するのは終了コードになる。7-4d で CI から呼ぶときには、画面を見る人がいない。
+
+終了コードは、複数の工程の結果を1つの数字に畳む。**既定の畳み方は「最後のコマンドの結果」であり、途中の失敗を見ていない。** 37節の実測（deploy hook が失敗しても certbot の終了コードは 0）と同じ形である。
+
+以下は、それを踏まえた設計である。
+
+| 書いたこと | 理由 |
+| --- | --- |
+| `set -euo pipefail` | 途中のどれか1つが失敗したら、そこで止めてその終了コードを返す。畳み方を「最後のコマンド」から「最初の失敗」へ変える。pipefail はパイプの途中の失敗を拾うため |
+| 全体を `{ }` で囲む | `git pull` がこのファイル自身を書き換えても、bash が読み進める途中で内容が変わらないようにするため。bash は `{ }` の中を先に読み切ってから実行する。囲む代償はゼロで、囲まない場合の代償はデプロイが壊れることなので、真偽を検証せず広いほうへ倒した（16節・39節と同じ非対称の判断） |
+| `git pull --ff-only` | 素の `git pull` は、サーバー側とリモートが分岐しているとマージを作る。サーバーではコミットしない約束だが、その約束が破れたときに黙ってマージするのではなく止める。前提を仮定ではなく強制にする |
+| 作業ツリーのクリーン確認 | サーバー上で手作業の編集や診断用ファイルの置き忘れがあると、`git pull` が失敗するか、意図しない状態でデプロイする。実際に一時ファイルを置く場面が繰り返し発生している |
+| Config / Routes / Views の CACHED 判定 | 「artisan が終了した」と「キャッシュができた」は別。終了コードに乗せる。NOT CACHED の行も文字列として CACHED を含むため、正規表現は行末まで固定している。`--no-ansi` は色の制御文字で判定が壊れるのを防ぐ |
+| サイトの応答確認を含めない | 「このスクリプトの成功」と「サイトの動作」は別である。37節が certbot の終了コードを信じず、サーバーが提示する証明書を外から観測する形にしたのと同じ分離。加えて Basic 認証の資格情報を CI に持たせたくない。応答確認は 7-9 で認証を撤去した後に設計する |
+| 自動で巻き戻さない | 巻き戻しの仕組みは、それ自体が失敗する経路を新しく作る。復旧の仕組みが壊れていると、壊れたことに気づけない（37節と同じ判断） |
+
+### 失敗したときの巻き戻し
+
+デプロイが途中で止まっても、自動では巻き戻らない（理由は上の「スクリプトの設計判断」を参照）。手動の経路は2つある。
+
+**主経路：revert して、通常どおりデプロイする**
+
+GitHub 側で問題のコミットを revert して push し、`./bin/deploy.sh` を実行する。サーバーが常に origin/main を追うという性質が保たれるため、スクリプトをそのまま使える。**原則としてこちらを使う。**
+
+**緊急経路：サーバー上で前のコミットを直接デプロイする**
+
+GitHub に到達できないときや、revert を待てないときに使う。
+
+```bash
+cd /var/www/portfolio
+git log --oneline -5
+git checkout <戻す先のコミット>
+(umask 027 && composer install --no-dev --optimize-autoloader --no-interaction \
+  && npm ci && npm run build \
+  && php artisan config:cache && php artisan route:cache && php artisan view:cache)
+```
+
+`deploy.sh` は使えない。`git checkout` で detached HEAD になり、スクリプトの中の `git pull --ff-only` が失敗するためである。同じ理由で `git reset --hard` も使わない（次の `git pull --ff-only` が最新まで早送りして、巻き戻しを取り消す）。
+
+復帰するときは `git checkout main` してから `./bin/deploy.sh` を実行する。
 
 ### 判断の理由
 
@@ -2943,11 +2995,12 @@ PNGが圧縮されないことの確認になる。対象に入れていない�
 
 | 維持依存 | 失われる契機 | 回復する手順 |
 | --- | --- | --- |
-| 19・23節 → 30節 | デプロイのたび。`composer install` が `bootstrap/cache/config.php` を削除する。`route:cache` を忘れると、`routes-v7.php` は残るため古いルートを黙って配信し続ける | 30節のキャッシュ生成（`config:cache` / `route:cache` / `view:cache`） |
+| 19・23節 → 30節 | デプロイのたび。`composer install` が `bootstrap/cache/config.php` を削除する。`route:cache` を忘れると、`routes-v7.php` は残るため古いルートを黙って配信し続ける | 30節のキャッシュ生成（`config:cache` / `route:cache` / `view:cache`）。7-4b の段階2で `bin/deploy.sh` に組み込み、実行を自動化した。人が忘れる経路は消えたが、**維持依存そのものは残っている**（スクリプトを実行し続ける必要がある）。自動化と消滅は別である |
 | 35・36節 → 37節 | certbotの自動更新（約60日ごと）。Nginxは起動時とreload時にしか証明書を読まない（37節・推測）ため、更新後も古い証明書を提示し続ける | 37節のdeploy hook（自動で走る） |
 | 21節 → （回復手順なし） | Nodeとnpmの版が上がる（aptの自動更新、CIの`setup-node`）。ビルド成果物が環境をまたいで一致するという実測が成り立たなくなる | 無い。7-4eでCIビルドへ移行すると、ビルドを行う場所が1つになるため、この要件そのものが消える。実測（2026-09-04）：`app-CYEMFStJ.js` 416,091バイト、`app-BqLPbuc1.css` 58,220バイト。21節が8月に記録した値と一致しており、この時点ではまだ劣化していない |
 | 16節 → （手動確認） | PHPのメジャーバージョンアップ。Nginxが指す`/run/php/php-fpm.sock`（alternatives経由）と、PHP-FPMが待ち受ける`/run/php/php8.5-fpm.sock`（バージョン固定）がずれる | 手動確認（この節の「定期的に発生するもの」に記載） |
 | 16節 →（条件付き。未発生） | `opcache.validate_timestamps`を0に変更した場合、デプロイのたびにPHP-FPMのreloadが必須になる | 現状は既定の1のため発生していない |
+| 30節 → bin/deploy.sh | `bin/deploy.sh` に段階を足したり順序を変えたりしたとき。30節の「スクリプトが行うこと（順に）」の一覧が古くなる | 無い。人が両方を直す必要がある。一覧を消せば消滅するが、bash を読まずに何が起きるか分かる価値を優先し、承知のうえで残している |
 
 22・29・38節 → 30節（権限）の3本は、7-4b で解消した。案Bにより、権限が作られる時点で満たされるようになり、維持する必要そのものが無くなった（自動化ではなく消滅）。
 
