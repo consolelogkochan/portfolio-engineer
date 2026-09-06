@@ -1207,7 +1207,15 @@ npm audit --omit=dev --audit-level=high
 
 本番依存（dependencies）には脆弱性がなく、6件はすべてdevDependencies（ビルドツール）側である。ブラウザに配信される成果物には含まれない。
 
-CIに`npm audit`のゲートを設ける件は別Issueとして管理している（PHP側には`composer audit`があるが、JavaScript側には同等のものがない）。
+CIに`npm audit`のゲートを設ける件は別Issueとして管理していたが、7-4cで対応した。
+
+7-4cでCIに2種類のゲートを追加した。1つがこの`npm audit`で、もう1つは本番と同じ依存構成でページが表示できるかの確認である（31節）。
+
+`npm audit`のゲートは二段にした。1段目は本番に載る依存（`--omit=dev`）を対象にhigh以上で失敗させ、2段目はdevを含む全依存を対象にcriticalで失敗させる。本番に載るかどうかで基準を変えており、開発だけに載る依存には緩い。緩めてよいと判断したのは、このCIワークフローがsecretsを一つも使っておらず、ビルド時に悪意あるコードが動いても被害の上限が「CIが落ちる・遅くなる」に留まるためである（実測：`.github/`配下にsecretsの参照は無い）。
+
+実測（2026-09-06）：報告されるhighは7件で、上記の6件から増えている。`--omit=dev`では0件のままである。したがって1段目・2段目とも緑であり、この7件は今回直さない。すべてdev側のビルドツール由来で、ブラウザに配信される成果物には入らないためである。
+
+`composer audit`はレベル指定なし（1件でも出れば失敗）のまま変えていない。`npm audit`を二段にしたのと非対称だが、composer側は現在0件であり、緩めれば将来の検出を取りこぼすだけで、緩める理由がない。
 
 なお`npm audit fix`はサーバー上で実行してはならない。package-lock.jsonはリポジトリ管理下のファイルであり、サーバーで書き換えるとgit管理外の差分が生まれる。
 
@@ -1752,6 +1760,16 @@ git checkout <戻す先のコミット>
 
 - **ホストのMacはPHP 8.4であり、composer.jsonの`php ^8.5`を満たさないため、composerをホストで実行できない。** Sailコンテナ内（PHP 8.5）で実行した。このリポジトリのcomposer操作は今後コンテナ内で行う
 - `--ignore-platform-req=php`で押し通す方法は採らない。「本番と同じPHPで依存解決する」前提が壊れるため
+
+### 同じ事故をCIで先に踏む（7-4c）
+
+この事故の型は、「`require`と`require-dev`の振り分けの誤りが、開発環境では`require-dev`が入っているために見えず、本番の`--no-dev`でだけ現れる」というものである。今回は`symfony/yaml`の欠落だったが、同じ型の誤りは今後も起こりうる。開発環境で`php artisan test`が緑でも、本番でだけ500になる。
+
+7-4cで、CIのジョブの最後に本番と同じ構成へ入れ替える手順を加えた。`composer install --no-dev --optimize-autoloader`のあと`php artisan serve`を立て、固定した6パス（`/`、`/works`、`/about`、`/contact`、`/sitemap.xml`、`/robots.txt`）を実際に引いて、すべて200であることを確認する。
+
+パスを固定したのは、個別の作品スラッグを列挙するとページが増えるたびにCIの修正が要るためである。`/sitemap.xml`はworksとlogsを全件走査するのでコンテンツの増加に自動で追随し、`/about`はMarkdownのレンダリング経路を、`/contact`はfront matterを通らない暗号化の経路を通す。
+
+このステップはジョブの末尾にある。`composer install --no-dev`が`phpunit`を消すため`php artisan test`より後に、`npm run build`の成果物（`manifest.json`）が要るためビルドより後に置く必要があり、この2条件を満たす位置がジョブの末尾になる。
 
 ---
 

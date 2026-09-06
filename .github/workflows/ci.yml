@@ -44,6 +44,16 @@ jobs:
 
       - run: composer audit
 
+      # npm 依存の脆弱性ゲート。二段にしている。
+      # 1段目：本番に載る依存（--omit=dev）だけを対象に high 以上で失敗させる。
+      # 2段目：dev を含む全依存を対象に critical で失敗させる。
+      # 本番に載るかどうかで基準を変えている（載るものは厳しく、開発だけのものは緩く）。
+      # 実測（2026-09-06）：1段目・2段目とも 0 件で緑。報告される high 7 件はすべて
+      # devDependencies 由来で、--omit=dev で 0 件になる。背景は docs/server-setup.md 21節。
+      - run: npm audit --omit=dev --audit-level=high
+
+      - run: npm audit --audit-level=critical
+
       - run: npm run build
 
       # php artisan testはnpm run buildの後に置く：resources/views/app.blade.phpの@vite()が
@@ -54,3 +64,24 @@ jobs:
       - run: php artisan test
 
       - run: npx tsx scripts/validate-content.ts
+
+      # ここから下は本番と同じ依存構成での表示確認。require / require-dev の振り分け誤りは
+      # 開発環境（require-dev あり）では気づけず、本番（--no-dev）でだけ 500 になる。
+      # 実際に symfony/yaml の欠落で初回公開が 500 になった（docs/server-setup.md 31節）。
+      # --no-dev は phpunit を消すため、php artisan test より後に置く。
+      - run: composer install --no-dev --optimize-autoloader --no-progress
+
+      # 固定パスだけを引く。個別スラッグを列挙するとページ追加のたびに CI 修正が要るため。
+      # /sitemap.xml は works と logs を全件走査するのでコンテンツ増加に自動で追随する。
+      # /about は Markdown レンダリング経路、/contact は front matter を通らない暗号化経路を通す。
+      - run: |
+          php artisan serve --port=8000 > /tmp/serve.log 2>&1 &
+          for i in $(seq 1 30); do
+            curl -sf http://127.0.0.1:8000/up > /dev/null && break
+            sleep 1
+          done
+          for path in / /works /about /contact /sitemap.xml /robots.txt; do
+            code=$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:8000$path")
+            echo "$path  $code"
+            [ "$code" = "200" ] || { echo "FAILED: $path -> $code" >&2; cat /tmp/serve.log >&2; exit 1; }
+          done
