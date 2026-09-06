@@ -76,10 +76,19 @@ jobs:
       # /about は Markdown レンダリング経路、/contact は front matter を通らない暗号化経路を通す。
       - run: |
           php artisan serve --port=8000 > /tmp/serve.log 2>&1 &
-          for i in $(seq 1 30); do
-            curl -sf http://127.0.0.1:8000/up > /dev/null && break
+          ready=""
+          for _ in $(seq 1 30); do
+            if curl -sf http://127.0.0.1:8000/up > /dev/null; then
+              ready=1
+              break
+            fi
             sleep 1
           done
+          if [ -z "$ready" ]; then
+            echo "開発サーバーが30秒以内に応答しませんでした。" >&2
+            cat /tmp/serve.log >&2
+            exit 1
+          fi
           for path in / /works /about /contact /sitemap.xml /robots.txt; do
             code=$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:8000$path")
             echo "$path  $code"
