@@ -1,0 +1,42 @@
+name: Deploy
+
+on:
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # このジョブは GITHUB_TOKEN を使わないので、権限を空にする。
+    permissions: {}
+    steps:
+      # 鍵と known_hosts を用意する。
+      # secrets を run: の中に ${{ }} で直接展開せず env: 経由にしているのは、
+      # ${{ }} がシェルの実行前にスクリプト本文へ文字列として展開されるため。
+      # 複数行の秘密鍵を直接書くと、改行がスクリプトの構造そのものを壊す。
+      - env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+
+      # デプロイを起動する。送る文字列（deploy）は authorized_keys の
+      # command= によって無視され、サーバー側の bin/deploy.sh が実行される。
+      # 終了コードは bin/deploy.sh のものがそのまま返る。
+      #
+      # サイトの応答確認はここに含めない。本番は現在 Basic 認証の内側にあり、
+      # 資格情報を CI に持たせない判断をしている（30節）。応答確認は
+      # 7-9 で認証を撤去したあとに設計する。
+      - env:
+          SSH_USER: ${{ secrets.SSH_USER }}
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+        run: |
+          ssh -i ~/.ssh/id_deploy \
+              -o IdentitiesOnly=yes \
+              -o StrictHostKeyChecking=yes \
+              -o BatchMode=yes \
+              "$SSH_USER@$SSH_HOST" deploy
