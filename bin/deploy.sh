@@ -114,12 +114,16 @@
     fi
   done
 
+  # 掃除の失敗はデプロイの失敗ではない。終了コードには畳まず、報告だけする。
   echo "==> 古い世代の掃除"
-  ls -1d "${root}/releases"/*/ 2>/dev/null | sort -r | tail -n +$((keep + 1)) \
-    | while read -r old; do
-        echo "削除: ${old}"
-        rm -rf "$old"
-      done
+  if ! ls -1d "${root}/releases"/*/ 2>/dev/null | sort -r | tail -n +$((keep + 1)) \
+       | while read -r old; do
+           echo "削除: ${old}"
+           rm -rf "$old"
+         done
+  then
+    echo "古い世代の掃除に失敗しました。デプロイ自体は完了しています。" >&2
+  fi
 
   echo "=== deploy finished (${stamp}) ==="
   exit 0

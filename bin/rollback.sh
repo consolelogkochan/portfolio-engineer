@@ -19,6 +19,11 @@
   cd "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/.."
   root="$PWD"
 
+  if [ -e "${root}/public/build" ] && [ ! -L "${root}/public/build" ]; then
+    echo "public/build が実体のディレクトリです。30節の移行手順を実行してください。" >&2
+    exit 1
+  fi
+
   current="$(readlink "${root}/public/build" 2>/dev/null || true)"
 
   if [ $# -eq 0 ]; then
