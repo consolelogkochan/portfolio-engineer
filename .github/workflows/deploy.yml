@@ -3,21 +3,59 @@ name: Deploy
 on:
   workflow_dispatch:
 
-# デプロイを同時に2つ走らせない。npm ci は node_modules を削除してから
-# 入れ直すため、重なるとビルド成果物が半端な状態で残りうる。
-# cancel-in-progress を false にしているのは、走っている途中のデプロイを
-# 止めるほうが危険なため。後から来たものを待たせる。
 concurrency:
   group: deploy
   cancel-in-progress: false
 
 jobs:
-  deploy:
+  # ビルドだけを行うジョブ。secrets を使わない。
+  # npm ci と npm run build は他人が書いたコードを実行するので、
+  # 鍵を持つ deploy ジョブとは別のマシンで動かす（30節）。
+  build:
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    # このジョブは GITHUB_TOKEN を使わないので、権限を空にする。
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm run build
+
+      # 成果物に、ビルドしたコミットのハッシュを添える。
+      # サーバー側で「取り込むコード」と「成果物」が同じコミット由来かを照合する。
+      - env:
+          COMMIT_SHA: ${{ github.sha }}
+        run: |
+          mkdir -p artifact
+          cp -R public/build artifact/build
+          printf '%s\n' "$COMMIT_SHA" > artifact/COMMIT
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: build
+          path: artifact
+          retention-days: 1
+
+  # デプロイを起動するジョブ。secrets を使う。
+  # このジョブでは npm を動かさない。成果物は実行せず、tar にして流すだけ。
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
     permissions: {}
     steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: build
+          path: artifact
+
       # 鍵と known_hosts を用意する。
       # secrets を run: の中に ${{ }} で直接展開せず env: 経由にしているのは、
       # ${{ }} がシェルの実行前にスクリプト本文へ文字列として展開されるため。
@@ -32,8 +70,9 @@ jobs:
           chmod 600 ~/.ssh/id_deploy
           printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
 
-      # デプロイを起動する。送る文字列（deploy）は authorized_keys の
-      # command= によって無視され、サーバー側の bin/deploy.sh が実行される。
+      # 成果物を tar にして、ssh の標準入力へ流す。
+      # 送る文字列（deploy）は authorized_keys の command= により無視され、
+      # サーバー側の bin/deploy.sh が起動する。tar はその標準入力に届く。
       # 終了コードは bin/deploy.sh のものがそのまま返る。
       #
       # サイトの応答確認はここに含めない。本番は現在 Basic 認証の内側にあり、
@@ -43,7 +82,8 @@ jobs:
           SSH_USER: ${{ secrets.SSH_USER }}
           SSH_HOST: ${{ secrets.SSH_HOST }}
         run: |
-          ssh -i ~/.ssh/id_deploy \
+          set -o pipefail
+          tar czf - -C artifact . | ssh -i ~/.ssh/id_deploy \
               -o IdentitiesOnly=yes \
               -o StrictHostKeyChecking=yes \
               -o BatchMode=yes \
