@@ -1783,14 +1783,19 @@ sudo chmod g-w,o-rwx /var/www/portfolio/bootstrap/cache/.gitignore
 ```bash
 cd /var/www/portfolio
 (umask 027 \
-  && mkdir -p releases/initial \
-  && cp -R public/build releases/initial/build \
+  && stamp="$(date -u +%Y%m%d-%H%M%S)" \
+  && mkdir -p "releases/${stamp}" \
+  && cp -R public/build "releases/${stamp}/build" \
   && rm -rf public/build \
-  && ln -s ../releases/initial/build public/build)
-readlink public/build   # ../releases/initial/build と出れば成功
+  && ln -s "../releases/${stamp}/build" public/build)
+readlink public/build   # ../releases/<タイムスタンプ>/build と出れば成功
 ```
 
-以後は `bin/deploy.sh` が世代を積んでいく。`releases/initial` は5世代を超えた時点で自動的に消える。
+- 世代のディレクトリ名は `YYYYMMDD-HHMMSS` 形式でなければならない。一覧の並び（`bin/rollback.sh`）と古い世代の掃除（`bin/deploy.sh`）が、名前の辞書順を時系列順として使っているため（詳細はこの節「スクリプトの設計判断」）。名前を人が決めず `date` に任せているのはこのため。
+- この方法で作った世代には `COMMIT` ファイルが無いので、`bin/rollback.sh` の一覧では「コミット不明」と表示される。これは正常。以降のデプロイで作られる世代にはコミットのハッシュが記録される。
+- `rm -rf public/build` の後・`ln -s` の前で失敗すると `public/build` が無い状態になる。中身は `releases/` 下のタイムスタンプのディレクトリ（`ls -1 releases/` で分かる）にコピー済みなので、`ln -s ../releases/<そのタイムスタンプ>/build public/build` を手で実行すれば復帰する。
+
+以後は `bin/deploy.sh` が世代を積んでいく。移行で作った世代は、5世代を超えた時点で自動的に消える。
 
 ### 既知の挙動：realpath キャッシュ
 
@@ -1817,6 +1822,7 @@ PHP-FPM の各ワーカーは、解決したパスを `realpath_cache_ttl`（既
 | symlink の張り替えは `ln -sfn` + `mv -T` | 新しい symlink を別名（`public/build.new`）で作ってから `mv -T` で被せる。`rename(2)` が不可分なので、切り替えの瞬間に壊れた状態が見えない |
 | 世代の掃除は新しい世代へ切り替えた後 | `bin/deploy.sh` は必ず新世代へ symlink を張り替えてから掃除する。掃除が消すのは常に「6番目以降に古い」世代なので、現在使われている世代（＝最新）を消すことはない |
 | 古い世代の掃除は best-effort にする | 掃除はデプロイが完了したあとに走る。ここで失敗しても、デプロイそのものは成功している。終了コードが表すべきなのは「デプロイが成功したか」であって「後始末まで完璧だったか」ではない。畳み方を間違えると判定が実態とずれる。掃除のパイプラインを `if !` の条件に置き、失敗しても `set -e` で止めず、標準エラーへ報告だけする |
+| 世代のディレクトリ名は `YYYYMMDD-HHMMSS` 形式に揃える | 一覧の並び（`bin/rollback.sh`）と古い世代の掃除（`bin/deploy.sh`）は、`sort` による名前の辞書順を時系列順として使っている。形式に合わない名前が1つでも混ざると、並びが崩れて古い世代が新しいと判定される。名前を作る経路は `bin/deploy.sh` と移行手順の2つだけなので、両方を形式に揃えることで前提を保つ。実際、移行手順が `releases/initial` という名前を使っていたため、本番で最古の世代が先頭に並んだ（`i` は `2` より後ろ） |
 | Config / Routes / Views の CACHED 判定 | 「artisan が終了した」と「キャッシュができた」は別。終了コードに乗せる。NOT CACHED の行も文字列として CACHED を含むため、正規表現は行末まで固定している。`--no-ansi` は色の制御文字で判定が壊れるのを防ぐ |
 | サイトの応答確認を含めない | 「このスクリプトの成功」と「サイトの動作」は別である。37節が certbot の終了コードを信じず、サーバーが提示する証明書を外から観測する形にしたのと同じ分離。加えて Basic 認証の資格情報を CI に持たせたくない。応答確認は 7-9 で認証を撤去した後に設計する |
 | 自動で巻き戻さない | 巻き戻しの仕組みは、それ自体が失敗する経路を新しく作る。復旧の仕組みが壊れていると、壊れたことに気づけない（37節と同じ判断） |
