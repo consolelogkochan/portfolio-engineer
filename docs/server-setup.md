@@ -1925,7 +1925,7 @@ git checkout <戻す先のコミット>
 
 `pro security-status`で保留中の3件は`node-lodash` / `node-lodash-packages` / `node-shell-quote`であり、いずれも`apt install npm`が引き込んだuniverseのパッケージである。本番のWebリクエスト処理には無関係。
 
-- **Node.js をサーバーから削除した。** 7-4e でビルドを CI へ移し、サーバーで Node を使う理由が無くなったため（21節・30節）、新方式が本番で成功したことを確認したうえで apt パッケージ（`nodejs` / `npm`）を除去した（合計460個。詳細は21節）。**ここに挙げた3件（`node-lodash` / `node-lodash-packages` / `node-shell-quote`）が実際に消えたかは、リポジトリからは確認できていない。** 21節に記録した削除対象の内訳は `node-*`（200個以上）という括りで把握しており、この3件の個別名までは突き合わせていない。確認する手段：サーバーで `dpkg -l node-lodash node-lodash-packages node-shell-quote` を実行し、いずれも見つからない応答になることを見る。あるいは `pro security-status` を再実行し、この3件が保留リストから消えていることを見る
+- **Node.js をサーバーから削除した。** 7-4e でビルドを CI へ移し、サーバーで Node を使う理由が無くなったため（21節・30節）、新方式が本番で成功したことを確認したうえで apt パッケージ（`nodejs` / `npm`）を除去した（合計460個。詳細は21節）。**ここに挙げた3件（`node-lodash` / `node-lodash-packages` / `node-shell-quote`）が実際に消えたことを確認した。** 実測（2026-09-11）：本番サーバーで `dpkg -l node-lodash node-lodash-packages node-shell-quote` を実行し、3件とも `dpkg-query: no packages found matching ...` の応答だった。もう一つの確認手段である `pro security-status` の再実行は行っていない（未実行）
 - ESMは外部サービスへの依存を増やすため、それに見合う対象が存在しない現状では有効化しない
 
 ---
