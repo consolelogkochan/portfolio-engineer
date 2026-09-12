@@ -859,7 +859,7 @@ phpinfo() ではなく必要な項目だけを出すこと。確認後は必ず�
 
 この統計は reload の直後に取ったもので、それ以前の状態は失われている。分かるのは「この規模のワークロードに対して設定値が十分かどうか」だけである。
 
-### PHP-FPMのプロセス設定（現状のみ。調整は実測後）
+### PHP-FPMのプロセス設定（PHP-FPMを入れた直後の値）
 
 ```bash
 grep -vE '^\s*(;|$)' /etc/php/8.5/fpm/pool.d/www.conf
@@ -867,7 +867,7 @@ ps -o pid,rss,cmd -C php-fpm8.5
 free -m
 ```
 
-現状：
+PHP-FPM を入れた直後、Laravel アプリを配置する前の値（26節の測定条件を参照）：
 
 ```
 user = www-data / group = www-data
@@ -878,6 +878,10 @@ pm.start_servers = 2
 pm.min_spare_servers = 1
 pm.max_spare_servers = 3
 ```
+
+このブロックは初期構築時点の記録であり、書き換えていない。初期構築時点の値は、後の調整が「何をどう変えたか」を読むための起点として意味を持つため、そのまま残す。
+
+その後の調整：`pm.max_children` は26節の実測にもとづき27節で `5` → `10` に変更した。`pm.max_requests` は当時未設定だったが、7-4f でこの節内の「判断：`pm.max_requests = 500` を設定する（7-4f）」のとおり `500` を設定した。**現在の値はそれぞれの節を参照すること（重複を避けるため、ここには書かない）。**
 
 アイドル時のメモリ：master 約35MB、poolプロセス各約13MB
 サーバー全体：Mem 1961MB（うちavailable 1562MB）、Swap 2047MB
