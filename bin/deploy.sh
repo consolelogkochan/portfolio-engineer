@@ -28,6 +28,7 @@
   stamp="$(date -u +%Y%m%d-%H%M%S)"
   incoming="${root}/releases/.incoming-$$"
 
+  # shellcheck disable=SC2329 # 直接は呼ばれない。trap cleanup EXIT 経由で呼ばれる（誤検出）
   cleanup() {
     rm -rf "$incoming"
   }
@@ -116,6 +117,9 @@
 
   # 掃除の失敗はデプロイの失敗ではない。終了コードには畳まず、報告だけする。
   echo "==> 古い世代の掃除"
+  # 世代名は date が作る数字とハイフンのみ（形式は docs/server-setup.md 30節）で、
+  # SC2012 が警戒する空白・改行を含む名前にはならない
+  # shellcheck disable=SC2012
   if ! ls -1d "${root}/releases"/*/ 2>/dev/null | sort -r | tail -n +$((keep + 1)) \
        | while read -r old; do
            echo "削除: ${old}"

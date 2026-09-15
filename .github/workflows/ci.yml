@@ -13,6 +13,11 @@ jobs:
     steps:
       - uses: actions/checkout@v7      # → @v7 に変更
 
+      # bin/*.sh の静的検査。ubuntu-latest に最初から入っている shellcheck を使う
+      # （インストールのステップは無い）。Node・PHP の準備と独立しているため、
+      # それらより先に置き、失敗を早く検知する。
+      - run: shellcheck bin/*.sh
+
       - uses: actions/setup-node@v7    # → @v7 に変更
         with:
           node-version-file: package.json

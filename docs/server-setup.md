@@ -1209,9 +1209,24 @@ APP_KEYはセッションとCookieの暗号化、および問い合わせフォ�
 理由：
 
 - **サーバー上で他人が書いたコードを実行しないため。** `npm ci` は数百の依存を取得し、`npm run build` はそれらのビルドツールを走らせる。これらはいずれも他人が書いたコードで、7-4e より前はそれが本番サーバーで動いていた。ビルドを使い捨ての CI マシンへ移し、サーバーへは成果物（`public/build/` の中身）だけを送る。
-- `package.json` は `"engines": { "node": "^24" }` を宣言している。7-4e より前、サーバーは apt の Node 22 で `npm ci` していたため宣言と実態が食い違い、`npm WARN EBADENGINE` が出ていた。**Node がサーバーから無くなることで、この食い違いは解消した。** ビルドを行うのは CI（`ci.yml` と `deploy.yml` の `build` ジョブ、いずれも `node-version: 24`）だけになる。
+- `package.json` は `"engines": { "node": "^24" }` を宣言している。7-4e より前、サーバーは apt の Node 22 で `npm ci` していたため宣言と実態が食い違い、`npm WARN EBADENGINE` が出ていた。**Node がサーバーから無くなることで、この食い違いは解消した。** ビルドを行うのは CI（`ci.yml` と `deploy.yml` の `build` ジョブ）だけになる。
 
-CI が検証するビルドと、本番に載るビルドは別のワークフローファイル（`ci.yml` と `deploy.yml`）にある。片方の `npm` コマンドや `node-version` を変えたら、もう片方も合わせる。`package.json` の `engines` とも揃える。
+CI が検証するビルドと、本番に載るビルドは別のワークフローファイル（`ci.yml` と `deploy.yml`）にある。7-4g より、Node の版は両方とも `package.json` の `engines` から読むため、版を揃える作業は要らなくなった（下記）。ただし `npm` のコマンドとステップの構成は依然として2箇所にあり、片方を変えたらもう片方も合わせる必要が残っている。
+
+**Node の版の宣言が1箇所になった（7-4g）**
+
+`ci.yml` と `deploy.yml` の `setup-node` ステップは、`node-version: 24` という値の直書きをやめ、`node-version-file: package.json` にした。`setup-node` が `package.json` の `engines.node` を読み、そこからビルドの Node の版を決める。
+
+実測（2026-09-15）：CI のログに次の出力があった。
+
+```
+Resolved package.json as ^24
+Found in cache @ /opt/hostedtoolcache/node/24.20.0/x64
+```
+
+`engines.node` の `^24` は **24.20.0** に解決された。以前の `node-version: 24` と同じ意味である。
+
+これにより、新しい結びつきができた。**`engines` を変えると、ビルドの Node の版が変わる。** これまで `engines` は `npm` が `EBADENGINE` の警告を出すための宣言であり、ビルドの Node の版そのものを決めるものではなかった。7-4g からは、宣言がそのままビルドの入力になる。
 
 デプロイで成果物がサーバーへ届く経路は30節、CI 側は `.github/workflows/deploy.yml` を参照。
 
@@ -1310,7 +1325,7 @@ Ubuntuではnodejsとnpmが別パッケージであり、npmパッケージが�
 
 7-4e より前、`package.json`は`"engines": { "node": "^24" }`を宣言する一方で本番サーバーは apt の Node 22 で`npm ci`しており、実行のたびに`npm WARN EBADENGINE`が出ていた。これは意図的な一時措置だった（開発と CI を 24 に揃え、本番の Node は一時的なものと位置づけていた）。
 
-7-4e でビルドを CI へ移し、サーバーでは `npm` を実行しなくなった。ビルドを行うのは `ci.yml` と `deploy.yml` の `build` ジョブ（どちらも `node-version: 24`）だけで、`engines` の `^24` と一致する。**宣言と実態の食い違いは解消した。**
+7-4e でビルドを CI へ移し、サーバーでは `npm` を実行しなくなった。ビルドを行うのは `ci.yml` と `deploy.yml` の `build` ジョブだけで、7-4g からは両方とも `engines` の `^24` を `node-version-file` 経由で直接読む。**宣言と実態の食い違いは解消した。**
 
 【npm依存の脆弱性について】
 
@@ -1836,6 +1851,28 @@ sudo chmod g-w,o-rwx /var/www/portfolio/bootstrap/cache/.gitignore
 
 【7-4e】ビルド（`npm ci` / `npm run build`）はサーバーから CI へ移った。他人が書いたビルドツールのコードは、鍵を持たない `build` ジョブの使い捨てマシンだけで走る。サーバーでまだリポジトリ由来のコードが走るのは `composer install`（`composer.json` の `scripts`）と PHP 本体である。上の結論は変わらない。
 
+**ブランチ保護（7-4g）**
+
+上の「防御線は `main` に何が入るかに移る」という結論を受け、`main` への書き込みに Rulesets（Classic branch protection ではない）でルールを設定した。開発者が GitHub の Web UI で設定した内容であり、この文書やリポジトリの中からは確認できない。実測（2026-09-15）：
+
+| 欄 | 値 |
+| --- | --- |
+| 仕組み | Rulesets |
+| Target branches | Default branch |
+| ルール | Restrict deletions／Require linear history／Block force pushes |
+| Bypass list | 空 |
+| Enforcement status | Active |
+
+**CI が緑であることを必須にする設定（Require status checks to pass）は入れなかった。** この設定は「まず別の ref へ push し、そこで検査が通る」ことを求める。つまり `main` への直接 push ができなくなり、作業用ブランチを経る運用に変わる。その代償に対して、得られるものが釣り合わなかった。デプロイは手動起動で、この節の「GitHub Actions からの起動」のとおり、起動する人が CI の緑を確認してから押す。`main` が赤くても直ちに本番には出ない。防げるのは「`main` が赤い状態になること」で、これは巻き戻し先としての `main` の信頼に関わるが、現時点では代償の方が大きいと判断した。
+
+再検討すべき条件：
+
+| 条件 | 何が変わるか |
+| --- | --- |
+| 作業する人が増えたとき | 「自分が気をつける」が成り立たなくなる |
+| 作業用ブランチを使う運用に変わったとき | 代償が消える。そのとき入れればよい |
+| `main` が赤いまま放置される事態が実際に起きたとき | 効果の側。想定が外れたことになる |
+
 **秘密の置き場所**
 
 - GitHub のリポジトリ secrets に4つ：`SSH_PRIVATE_KEY` / `SSH_HOST` / `SSH_USER` / `SSH_KNOWN_HOSTS`。Basic 認証の資格情報は置いていない。
@@ -1990,6 +2027,35 @@ git checkout <戻す先のコミット>
 - `bootstrap/cache`が`drwxr-s---`、配下のファイルは`-rw-r-----` / `-rwxr-x---`
 - `.env`が`-rw-r-----` `<USER>`:www-data
 - 全ページと問い合わせフォームが正常に動作し、新規エラーなし
+
+### CI ワークフローの整理（7-4g）
+
+**action の版を v7 に上げた**
+
+`ci.yml` と `deploy.yml` の `actions/checkout` と `actions/setup-node` を `@v5` から `@v7` へ上げた。`v5` が非推奨だったからではない。非推奨化の対象は Node.js 20 ランタイムであり、`v5` は既に Node 24 に更新済みで対象外だった。上げた理由は、このリポジトリの使い方に影響する変更が見当たらず、据え置く理由もないため。上げて壊れれば CI が赤くなる（静かに壊れない）。`actions/upload-artifact` と `actions/download-artifact` は、調査の時点で既に最新版だった。
+
+**shellcheck を CI に足した**
+
+`ci.yml` に、`ubuntu-latest` ランナーへ最初から入っている shellcheck を使うステップを足した。インストールのステップは無い。`bin/*.sh` には、抑制の注釈（`shellcheck disable`）が3件ある。いずれも直すべきでないと判断したものである。
+
+- `bin/deploy.sh` の `cleanup()` への SC2329（この関数は呼ばれていない）：誤検出。`trap cleanup EXIT` 経由で呼ばれている
+- `bin/deploy.sh` と `bin/rollback.sh` の `ls -1d` への SC2012（`ls` ではなく `find` を使え）：指摘の前提が成り立たない。SC2012 が警戒するのはファイル名に空白や改行が含まれる場合だが、世代名は `date` が作る数字とハイフンのみで、その形式はこの節の「スクリプトの設計判断」に定めている
+
+知っておくべき性質が2つある。**ランナーイメージの更新で shellcheck の版が変わりうる。** 版が上がれば新しい指摘が出て、CI が赤くなることがある。**shellcheck が捕まえるのは構文で、論理の誤りは捕まえない。** 7-4e で見つかった欠陥（古い世代の掃除の失敗を終了コードへ畳んでいた）は、構文としては正しく、shellcheck では検出されない。
+
+**再利用可能ワークフローを採らなかった**
+
+`ci.yml` と `deploy.yml` の `build` の二重管理は、7-4g で `node-version` の重複だけを消した（21節）。二重管理そのものは残っている。
+
+根本解決の案（再利用可能ワークフロー）は採らなかった。呼び出し側のジョブは自分の `steps:` を持てないため、`ci.yml` を1ジョブから2ジョブへ組み替え、成果物を artifact で受け渡す構造に変える必要がある。`ci.yml` にもサードパーティの action が入り、実行時間も増える。二重管理が実害を出した回数は、7-4e で作ってから0回である。
+
+再検討すべき条件：
+
+| 条件 |
+| --- |
+| `ci.yml` と `deploy.yml` のビルド手順が実際に食い違ったとき |
+| ビルドのステップが増えて、手で揃える負担が実感できるようになったとき |
+| `ci.yml` の構造を触る別の理由ができたとき（そのついでに行う） |
 
 ---
 
@@ -3269,7 +3335,7 @@ PNGが圧縮されないことの確認になる。対象に入れていない�
 | 16節 → （手動確認） | PHPのメジャーバージョンアップ。Nginxが指す`/run/php/php-fpm.sock`（alternatives経由）と、PHP-FPMが待ち受ける`/run/php/php8.5-fpm.sock`（バージョン固定）がずれる | 手動確認（この節の「定期的に発生するもの」に記載） |
 | 16節 →（条件付き。未発生） | `opcache.validate_timestamps`を0に変更した場合、デプロイのたびにPHP-FPMのreloadが必須になる | 現状は既定の1のため発生していない。7-4f で実測のうえ再検討し、`1`のまま維持すると判断した（再検討すべき条件は16節に記載） |
 | 30節 → bin/deploy.sh | `bin/deploy.sh` に段階を足したり順序を変えたりしたとき。30節の手順一覧が古くなる | 無い。人が両方を直す必要がある |
-| 30節・21節 → ci.yml と deploy.yml の build ジョブ（7-4e） | 本番に載るビルドは `deploy.yml` の `build` ジョブが作る。`ci.yml` が検証するのは `ci.yml` 自身の build ステップ。両者の `npm` コマンドや `node-version` がずれると、CI が緑でも本番に載る成果物が検証したものと違いうる | 21節に記載（片方を変えたらもう片方も合わせる） |
+| 30節・21節 → ci.yml と deploy.yml の build ジョブ（7-4e） | 本番に載るビルドは `deploy.yml` の `build` ジョブが作る。`ci.yml` が検証するのは `ci.yml` 自身の build ステップ。両者の `npm` コマンドやステップの構成がずれると、CI が緑でも本番に載る成果物が検証したものと違いうる（Node の版は7-4gで両方とも `engines` から読むようになり、ここではずれなくなった） | 21節に記載（片方を変えたらもう片方も合わせる） |
 | 30節 → `authorized_keys` の `command=`（7-4d） | `bin/deploy.sh` を移動・改名したとき。サーバーの `~/.ssh/authorized_keys` にある `command=` のパスがずれ、CI からのデプロイが失敗する。この行はリポジトリの外にあり、`git pull` では追随しない | サーバーで `authorized_keys` の `command=` のパスを手で直す |
 | 30節 → GitHub secrets の `SSH_HOST` と `SSH_KNOWN_HOSTS`（7-4d） | ssh の接続先ホストを変えたとき（7-9 で独自ドメインへ切り替える場合を含む）。`SSH_HOST` だけ変えて `SSH_KNOWN_HOSTS` を変えないと、`deploy.yml` の `StrictHostKeyChecking=yes` が新しいホスト鍵を拒否して接続できない | GitHub の secrets で両方を同時に直す |
 

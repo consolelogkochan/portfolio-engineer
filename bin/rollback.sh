@@ -28,6 +28,9 @@
 
   if [ $# -eq 0 ]; then
     echo "保持している世代（新しい順）:"
+    # 世代名は date が作る数字とハイフンのみ（形式は docs/server-setup.md 30節）で、
+    # SC2012 が警戒する空白・改行を含む名前にはならない
+    # shellcheck disable=SC2012
     ls -1d "${root}/releases"/*/ 2>/dev/null | sort -r | while read -r dir; do
       name="$(basename "$dir")"
       commit="$(cat "${dir}COMMIT" 2>/dev/null || echo "(コミット不明)")"
