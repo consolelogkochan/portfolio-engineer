@@ -11,11 +11,11 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v5      # → @v5 に変更
+      - uses: actions/checkout@v7      # → @v7 に変更
 
-      - uses: actions/setup-node@v5    # → @v5 に変更
+      - uses: actions/setup-node@v7    # → @v7 に変更
         with:
-          node-version: 24
+          node-version-file: package.json
           cache: npm
 
       - uses: shivammathur/setup-php@v2
