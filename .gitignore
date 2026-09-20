@@ -10,6 +10,10 @@
 /.idea
 /.nova
 /.phpunit.cache
+/.protocol/*
+!/.protocol/README.md
+/.records/*
+!/.records/README.md
 /.reviews/
 /.vscode
 /.zed
