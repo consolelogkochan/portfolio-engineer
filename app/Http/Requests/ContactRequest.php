@@ -52,7 +52,7 @@ class ContactRequest extends FormRequest
     public function detectSpam(): ?string
     {
         // 第1層：ハニーポット（人間には見えない囮フィールドが埋まっていたらボット）
-        if ($this->input('website', '') !== '') {
+        if ($this->filled('website')) {
             return 'honeypot';
         }
 

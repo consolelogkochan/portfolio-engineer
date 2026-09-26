@@ -37,15 +37,26 @@ class ContactController extends Controller
         $spamReason = $request->detectSpam();
 
         if ($spamReason !== null) {
-            // 静かに弾く：ボットにはメールが送られたように見せ、実際には送らない。
-            // 誤検知把握のためログに残す。
+            // 誤検知把握のためログに残す。入力内容は記録しない。
             Log::warning('Contact spam detected', [
                 'reason' => $spamReason,
                 'ip' => $request->ip(),
                 'user_agent' => $request->userAgent(),
             ]);
 
-            return redirect()->back()->with('success', 'お問い合わせを受け付けました。折り返しご連絡いたします。');
+            // ボットの特徴（ハニーポット・時間トラップ）は静かに弾く：
+            // ボットにはメールが送られたように見せ、実際には送らない。
+            if (in_array($spamReason, ['honeypot', 'too_fast'], true)) {
+                return redirect()->back()->with('success', 'お問い合わせを受け付けました。折り返しご連絡いたします。');
+            }
+
+            // 人間が現実に掛かりうる層（URL数・トークン破損）は、本人が気づいて
+            // 送り直せるようにエラーを返す。メールは送らない。
+            $message = $spamReason === 'too_many_urls'
+                ? '本文に含まれるリンクが多すぎます。リンクの数を減らして、もう一度お試しください。'
+                : '送信内容を確認できませんでした。お手数ですが、ページを再読み込みしてから、もう一度お試しください。';
+
+            return redirect()->back()->withInput()->withErrors(['message' => $message]);
         }
 
         $data = $request->validated();
