@@ -9,7 +9,7 @@ type ContactFormData = ContactInput & {
   form_token: string; // 時間トラップ用トークン
 };
 
-type ServerErrors = Partial<Record<keyof ContactInput, string>>;
+type ServerErrors = Partial<Record<keyof ContactInput, string>> & { general?: string };
 
 type Props = {
   form_token: string;
@@ -64,7 +64,7 @@ export default function Index({ form_token, pageTitle }: Props) {
 
   // クライアントエラーがあればそちら優先、なければサーバーエラーを表示。
   // processing 中（post() 呼び出し〜レスポンス到着）は serverErrors を隠す。
-  const errors: Partial<Record<keyof ContactInput, string>> =
+  const errors: ServerErrors =
     Object.keys(clientErrors).length > 0 ? clientErrors : processing ? {} : serverErrors;
 
   return (
@@ -87,6 +87,11 @@ export default function Index({ form_token, pageTitle }: Props) {
           {flash.rate_limited}
         </p>
       )}
+
+      {/* メール送信失敗・URL数超過・トークン破損など、特定の入力欄に紐付かないエラー
+          （ContactController::store）。errors.general はフィールド名ではなく、
+          フィールドに紐付かないエラー用の枠として設けている。 */}
+      {errors.general && <p className="text-error text-sm mb-6">{errors.general}</p>}
 
       <form onSubmit={handleSubmit} className="space-y-5">
         {/* ハニーポット：人間には見えない囮フィールド。支援技術が触れないよう aria-hidden を付ける。

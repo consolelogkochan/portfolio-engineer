@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Inertia\Inertia;
 use Inertia\Response;
+use Symfony\Component\Mailer\Exception\TransportExceptionInterface;
 
 class ContactController extends Controller
 {
@@ -56,17 +57,30 @@ class ContactController extends Controller
                 ? '本文に含まれるリンクが多すぎます。リンクの数を減らして、もう一度お試しください。'
                 : '送信内容を確認できませんでした。お手数ですが、ページを再読み込みしてから、もう一度お試しください。';
 
-            return redirect()->back()->withInput()->withErrors(['message' => $message]);
+            return redirect()->back()->withInput()->withErrors(['general' => $message]);
         }
 
         $data = $request->validated();
 
-        Mail::to(config('mail.contact_to'))->send(new ContactMail(
-            userName: $data['name'],
-            userEmail: $data['email'],
-            contactSubject: $data['subject'],
-            userMessage: $data['message'],
-        ));
+        try {
+            Mail::to(config('mail.contact_to'))->send(new ContactMail(
+                userName: $data['name'],
+                userEmail: $data['email'],
+                contactSubject: $data['subject'],
+                userMessage: $data['message'],
+            ));
+        } catch (TransportExceptionInterface $e) {
+            // 送信失敗の原因把握のためログに残す。入力内容は記録しない。
+            Log::error('Contact mail send failed', [
+                'exception' => $e::class,
+                'message' => $e->getMessage(),
+                'code' => $e->getCode(),
+            ]);
+
+            return redirect()->back()->withInput()->withErrors([
+                'general' => '申し訳ありません。メールの送信に失敗しました。お時間をおいて、もう一度お試しください。',
+            ]);
+        }
 
         return redirect()->back()->with('success', 'お問い合わせを受け付けました。折り返しご連絡いたします。');
     }

@@ -6,7 +6,9 @@ namespace Tests\Feature;
 
 use App\Mail\ContactMail;
 use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
+use Symfony\Component\Mailer\Exception\TransportException;
 use Tests\TestCase;
 
 /**
@@ -95,8 +97,8 @@ class ContactTest extends TestCase
         ]));
 
         Mail::assertNothingSent();
-        $response->assertSessionHasErrors('message');
-        $response->assertSessionDoesntHaveErrors(['name', 'email', 'subject']);
+        $response->assertSessionHasErrors('general');
+        $response->assertSessionDoesntHaveErrors(['name', 'email', 'subject', 'message']);
     }
 
     /** form_tokenが復号できない場合も、メールを送らずエラーを返す */
@@ -109,6 +111,48 @@ class ContactTest extends TestCase
         ]));
 
         Mail::assertNothingSent();
-        $response->assertSessionHasErrors('message');
+        $response->assertSessionHasErrors('general');
+    }
+
+    /** メール送信で例外（Symfony MailerのTransportExceptionInterface）が投げられた場合、
+     *  500にせず、汎用エラー枠（errors.general）で返し、入力内容を保持する */
+    public function test_mail_send_failure_returns_generic_error_and_preserves_input(): void
+    {
+        Mail::shouldReceive('to')->once()->andReturnSelf();
+        Mail::shouldReceive('send')->once()->andThrow(
+            new TransportException('simulated failure'),
+        );
+
+        $payload = $this->validPayload();
+        $response = $this->post('/contact', $payload);
+
+        $response->assertSessionHasErrors('general');
+        $response->assertSessionDoesntHaveErrors(['name', 'email', 'subject', 'message']);
+        $response->assertSessionHasInput('name', $payload['name']);
+        $response->assertSessionHasInput('email', $payload['email']);
+        $response->assertSessionHasInput('subject', $payload['subject']);
+        $response->assertSessionHasInput('message', $payload['message']);
+    }
+
+    /** メール送信失敗時、errorレベルでログに残す。入力内容は記録しない */
+    public function test_mail_send_failure_logs_at_error_level(): void
+    {
+        Mail::shouldReceive('to')->once()->andReturnSelf();
+        Mail::shouldReceive('send')->once()->andThrow(
+            new TransportException('simulated failure'),
+        );
+
+        Log::shouldReceive('error')
+            ->once()
+            ->withArgs(function (string $message, array $context) {
+                return $message === 'Contact mail send failed'
+                    && $context === [
+                        'exception' => TransportException::class,
+                        'message' => 'simulated failure',
+                        'code' => 0,
+                    ];
+            });
+
+        $this->post('/contact', $this->validPayload());
     }
 }
