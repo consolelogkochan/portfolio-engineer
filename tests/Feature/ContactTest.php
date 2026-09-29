@@ -155,4 +155,17 @@ class ContactTest extends TestCase
 
         $this->post('/contact', $this->validPayload());
     }
+
+    /** 通知メールのReply-Toに、フォームに入力された送信者のアドレスと名前が入っている */
+    public function test_contact_mail_has_reply_to_the_sender(): void
+    {
+        Mail::fake();
+
+        $payload = $this->validPayload();
+        $this->post('/contact', $payload);
+
+        Mail::assertSent(ContactMail::class, function (ContactMail $mail) use ($payload) {
+            return $mail->hasReplyTo($payload['email'], $payload['name']);
+        });
+    }
 }
