@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Services\PageMetaBuilder;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
@@ -43,6 +44,9 @@ class HandleInertiaRequests extends Middleware
                 'success' => fn () => $request->session()->get('success'),
                 'rate_limited' => fn () => $request->session()->get('rate_limited'),
             ],
+            // ヘッダーのロゴ・フッターの©に使うサイト名（7-6a）。定義はconfig/page_meta.phpの1箇所のみ。
+            // configの読み出しはPageMetaBuilderに集約する設計のため、ここで直接configを引かない。
+            'siteName' => fn () => app(PageMetaBuilder::class)->siteName(),
         ];
     }
 }

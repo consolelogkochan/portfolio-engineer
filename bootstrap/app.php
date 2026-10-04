@@ -47,11 +47,13 @@ return Application::configure(basePath: dirname(__DIR__))
             // Laravel 標準の例外ハンドリングに委ねる。
             // テスト時に例外の詳細（スタックトレース等）を確認できるようにするため。
             //
-            // この結果、testing 環境では ErrorPage が render されないため、
-            // ErrorPage の meta を feature test で検証できない（7-2で実測確認済み）。
-            // テスト可能にするために testing を除外対象から外すことは、上記の理由により行わない。
-            // ErrorPage の meta は固定文言であり変更頻度がほぼゼロのため、
-            // 検証の網から外すコストは小さいと判断した。
+            // この結果、testing 環境では ErrorPage が render されない（7-2で実測確認済み）。
+            // テスト可能にするために testing を除外対象から外すことは、上記の理由により行わない
+            // （判定の条件そのものは変えていない）。
+            // ErrorPage の meta は固定文言であり、引き続き feature test では検証しない。
+            // ただし、エラーページの経路でヘッダー・フッターの値が届かない退行が起きたため（7-6a）、
+            // siteName が届くことだけは tests/Feature/SharedPropsTest.php で、
+            // テストの中だけ環境を切り替えて確かめている。
             if (app()->environment(['local', 'testing']) || ! in_array($statusCode, [403, 404, 500, 503], true)) {
                 return $response;
             }
@@ -62,13 +64,19 @@ return Application::configure(basePath: dirname(__DIR__))
             $pageMetaBuilder = app(PageMetaBuilder::class);
             $meta = $pageMetaBuilder->build('error');
 
-            // titleSuffix：JS実行後、React側（ErrorPage.tsx）がSTATUS_CONTENTのtitleと結合し
-            // 「ページが見つかりません — Kotaro」のようにサイト名サフィックス付きにするために渡す。
+            // titleSuffix：JS実行後、React側（ErrorPage.tsx）がSTATUS_CONTENTのtitleと結合し、
+            // サイト名のサフィックス付きのタイトルにするために渡す。
             // 区切り文字・サイト名の定義はconfig('page_meta.site_name')の1箇所のまま
             // （結合処理だけがBlade側とReact側の2箇所に存在する）。
+            //
+            // siteName：BaseLayout（ヘッダーのロゴ・フッターの©）が使う値。
+            // どのルートにも一致しない要求では web ミドルウェアグループが走らず、
+            // 共有props（HandleInertiaRequests::share()）が届かないため、ここで直接渡す（7-6a）。
+            // 共有propsに BaseLayout が使う項目を足したときは、ここにも足す必要があるかを確認すること。
             return Inertia::render('ErrorPage', [
                 'status' => $statusCode,
                 'titleSuffix' => $pageMetaBuilder->titleSuffix(),
+                'siteName' => $pageMetaBuilder->siteName(),
             ])
                 ->withViewData(['pageMeta' => $meta])
                 ->toResponse($request)

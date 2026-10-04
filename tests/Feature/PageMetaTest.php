@@ -16,8 +16,10 @@ use Tests\TestCase;
  * 構造のみを検証する。
  *
  * ErrorPage（404等）はbootstrap/app.phpのrespondでlocal/testing環境が除外されるため、
- * テスト環境ではカスタムErrorPageを描画できない。bootstrap/app.phpの環境判定を
- * 迂回するテストは意図的に書かない（このファイルにErrorPageのテストが無いのはそのため）。
+ * テスト環境ではカスタムErrorPageを描画できない。このファイル（meta情報の検証）では、
+ * 引き続きErrorPageのmetaは検証しない（固定文言のため）。
+ * ただし、エラーページの経路でsiteNameが届かない退行が起きたため（7-6a）、その経路だけは
+ * tests/Feature/SharedPropsTest.php で、テストの中だけ環境をproductionに切り替えて確かめている。
  */
 class PageMetaTest extends TestCase
 {

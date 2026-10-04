@@ -1,4 +1,4 @@
-import { Link } from '@inertiajs/react';
+import { Link, usePage } from '@inertiajs/react';
 import React from 'react';
 
 type Props = {
@@ -6,6 +6,10 @@ type Props = {
 };
 
 export default function BaseLayout({ children }: Props) {
+  // サイト名は config/page_meta.php の site_name が唯一の定義。HandleInertiaRequests::share() の
+  // 共有props（siteName）で受け取り、TSXに文字列を直接書かない（7-6a）。
+  const { siteName } = usePage<{ siteName: string }>().props;
+
   return (
     // body は app.css @layer base で bg-background / text-text / font-sans 適用済み
     <div className="flex min-h-screen flex-col">
@@ -13,7 +17,7 @@ export default function BaseLayout({ children }: Props) {
         {/* サイト名: モノスペース＋グリーンアクセントでエンジニア感を出す。
             375px幅でナビ3項目と並べても横あふれしないよう、モバイルは一段小さく（md以上で現状サイズ） */}
         <Link href="/" className="font-mono font-bold text-primary text-sm md:text-base">
-          portfolio-engineer
+          {siteName}
         </Link>
         <nav className="flex gap-4 md:gap-6 text-sm">
           <Link href="/works" className="text-text-muted hover:text-primary">
@@ -31,7 +35,9 @@ export default function BaseLayout({ children }: Props) {
       <main className="mx-auto w-full max-w-4xl flex-1 px-4 py-8">{children}</main>
 
       <footer className="border-t border-border px-6 py-4 text-center text-sm text-text-muted">
-        <p>© {new Date().getFullYear()} portfolio-engineer</p>
+        <p>
+          © {new Date().getFullYear()} {siteName}
+        </p>
       </footer>
     </div>
   );

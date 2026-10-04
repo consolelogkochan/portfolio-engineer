@@ -73,9 +73,18 @@ class PageMetaBuilder
      */
     private function fullTitle(?string $title): string
     {
-        $siteName = (string) config('page_meta.site_name');
+        return $title ? $title.$this->titleSuffix() : $this->siteName();
+    }
 
-        return $title ? $title.$this->titleSuffix() : $siteName;
+    /**
+     * サイト名（config('page_meta.site_name')）。
+     * HandleInertiaRequests::share() がヘッダー・フッター用に共有propsとして渡すために公開する（7-6a）。
+     * configの読み出しをこのクラスに集約する設計（config/page_meta.php のコメント参照）を保つため、
+     * 共有側でconfigを直接引かず、ここを経由させる。
+     */
+    public function siteName(): string
+    {
+        return (string) config('page_meta.site_name');
     }
 
     /**
@@ -85,7 +94,7 @@ class PageMetaBuilder
      */
     public function titleSuffix(): string
     {
-        return ' — '.(string) config('page_meta.site_name');
+        return ' — '.$this->siteName();
     }
 
     /** 相対パスをconfig('app.url')基点の絶対URLにする。既に絶対URL（http(s)://〜）ならそのまま返す */

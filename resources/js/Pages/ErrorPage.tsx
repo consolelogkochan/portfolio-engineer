@@ -1,6 +1,7 @@
 // 404/403/500/503共通のエラーページ（6-2）。statusで中身（例外名・コメント文）だけ出し分け、
 // 構造（数字→コード風の一文→コメント→トップへ戻る）は共通。
-// bootstrap/app.php の respond() から Inertia::render('ErrorPage', ['status' => $statusCode]) で呼ばれる。
+// bootstrap/app.php の respond() から Inertia::render('ErrorPage', …) で呼ばれる。
+// 渡される props はそちらを参照すること（ここに列挙すると、props が増えるたびに古くなるため）。
 // BaseLayout（ヘッダー・ナビ）は app.tsx の resolve() が自動で適用するため、ここでは意識しない。
 import PageMeta from '@/Components/PageMeta';
 import { Link } from '@inertiajs/react';
