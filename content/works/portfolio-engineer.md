@@ -3,23 +3,28 @@ title: "portfolio-engineer"
 category: "個人開発"
 status: "公開中"
 featured: true
-summary: "エンジニアとしてのポートフォリオサイト。設計・実装の過程を含めて公開しています。"
-publishedAt: "2026-03-01"
+summary: "AIと実装し、判断の理由を記録しながら、設計から本番の運用までを進めたポートフォリオサイト。このサイト自身が作品です。"
+publishedAt: "2026-10-05"
 period:
-  start: "2026-03-01"
+  start: "2026-06-14"
 role:
+  - "企画"
   - "設計"
-  - "実装"
+  - "開発"
+  - "運用"
 technologies:
   - "Laravel"
   - "Inertia.js"
   - "React"
   - "TypeScript"
   - "Tailwind CSS"
+  - "Ubuntu"
+  - "Nginx"
+  - "GitHub Actions"
 aiTools:
   - "Claude Code"
-liveUrl: "https://portfolio-engineer.example.com"
-repoUrl: "https://github.com/example/portfolio-engineer"
+  - "Claude"
+repoUrl: "https://github.com/consolelogkochan/portfolio-engineer"
 thumbnail: "/images/works/portfolio-engineer/thumbnail-test.webp"
 gallery:
   - src: "/images/works/portfolio-engineer/gallery/portfolio-ver2-1.webp"
@@ -38,39 +43,37 @@ gallery:
     alt: "Contact meセクション。name・mail・messageの入力フォーム"
     caption: "Contact：問い合わせフォーム"
 metrics:
-  - label: "Lighthouse スコア"
-    value: "98"
-    unit: "点"
-  - label: "実装カード数"
-    value: "50"
-    unit: "枚"
-  - label: "デザイントークン数"
-    value: "12"
+  - label: "CIの自動検査"
+    value: "13"
+    unit: "項目"
+  - label: "テスト"
+    value: "21"
+    unit: "件"
+  - label: "手順書"
+    value: "41"
+    unit: "節"
 ---
-
-<!-- ダミーデータ：表示確認用（本文タイポグラフィ確認用サンプル） -->
 
 ## 背景
 
-エンジニアとしての実績を伝えるポートフォリオサイトが欲しかったが、既存のテンプレートは**設計や実装の過程**を伝えるのに向いていなかった。そこで、Laravel + Inertia.js + React構成で一から構築することにした。
+エンジニアとしての実績を伝えるポートフォリオサイトが欲しかったが、以前WordPressで作ったサイトは更新のたびにGUIを操作する必要があり、手間がかかっていた。また、既存のテンプレートは**設計や運用の過程**を伝えるのに向いていなかった。そこで、実装はAIと進めながら、一から構築することにした。
 
-このサイトで特に意識したのは以下の点。
+## コンセプト
 
-- 設計判断の理由を残すこと
-- 作品ごとにMarkdownで本文を管理できること
-- ダークテーマを基調にした一貫したデザイントークン
+1. **判断の理由を残す**：なぜその設計にしたか、いつ見直すかを記録する
+2. **更新しやすい**：作品ごとにMarkdownで本文を書き、Gitで管理する
+3. **運用まで自分で担う**：本番環境の構築からデプロイ、障害への対応までを自分で行う
 
-### 技術選定
+## 技術選定
 
-バックエンドはLaravel、フロントはInertia.js経由のReact + TypeScriptを採用した。理由は*学習コストを抑えつつ*、SPAらしい体験を実現できるため。
+学習していた技術の中心がLaravelとReactだったため、この2つを組み合わせた。このサイトは、問い合わせフォームのようにサーバー側の処理が必要な部分はあるものの、ほとんどは読むだけのページである。そのため、APIを別に用意する方式よりも、Inertia.jsでサーバーから画面へデータを直接渡す方式のほうがシンプルに実装できると判断した。
 
-コンテンツはGit管理のMarkdownファイル（`content/works/*.md`）とし、CMSは導入していない。
+日常的な運用を想定し、デプロイはGitHub Actionsから行えるようにした。インフラまわりを一度学びたかったため、VPSにUbuntu + Nginx + PHP-FPMを自分でセットアップしている。
 
 ## 工夫した点
 
-1. デザイントークンをCSS変数で一元管理し、コンポーネントはsemantic層のみ参照する
-2. `WorkCard`は画像全面オーバーレイパターンを採用し、クリック領域は擬似要素で拡張した
-3. 本文の整形は `@tailwindcss/typography` を使わず自前CSSで対応し、既存のダーク＋緑トークンと衝突しないようにした
+1. **判断の理由を残す**：サーバーの設定とその理由を手順書にまとめ、「変えない」と決めたことにも見直す条件を添えた
+2. **更新しやすい**：作品の情報（front matter）はZodでスキーマを検証し、コミット前とCIの両方で検査する。書き間違いは公開の前に見つかり、1件が壊れてもサイト全体は落とさない
+3. **運用まで自分で担う**：ビルドはCIで行い、サーバーには成果物だけを送る形にした。サーバー上でビルドすると、ビルドに使う多数の外部パッケージのコードを本番で動かすことになり、セキュリティの面で構造的な弱点になる。あわせて、サーバー上で管理するツール（Node.js）が減り、運用の負担も軽くなった
 
-> 大切なのは、見た目を作り込むことよりも「なぜその設計にしたか」を残すこと。
-> 完成度よりも判断の過程を優先した。
+> AIの出力はその場限り。だから判断の理由を記録し、手順を作ってきた。このサイトは、その仕組みを試しながら作った作品である。
