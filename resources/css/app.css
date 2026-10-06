@@ -125,6 +125,8 @@
    * 対応タイミング：実際にフェンスコードブロックが必要になった時点で、
    *   .case-study pre に overflow-x: auto 等を追加する。 */
 
+  /* 見出しの階層を色と区切り線で分ける（7-6b）：緑は h2 だけに使い、h3 は本文の文字色にする。
+     h2 の上に区切り線を引くが、本文の先頭の h2 には引かない（タイトルの直後に線が来るのを避ける）。 */
   .case-study h2 {
     font-size: 1.125rem;
     font-weight: 700;
@@ -133,10 +135,15 @@
     margin-bottom: 0.5rem;
   }
 
+  .case-study h2:not(:first-child) {
+    border-top: 1px solid var(--color-border);
+    padding-top: 1.25rem;
+  }
+
   .case-study h3 {
     font-size: 1rem;
     font-weight: 700;
-    color: var(--color-heading);
+    color: var(--color-text);
     margin-top: 1.25rem;
     margin-bottom: 0.5rem;
   }
@@ -153,6 +160,10 @@
     .case-study h2 {
       font-size: 1.25rem;
       margin-top: 2rem;
+    }
+
+    .case-study h2:not(:first-child) {
+      padding-top: 1.5rem;
     }
 
     .case-study h3 {
