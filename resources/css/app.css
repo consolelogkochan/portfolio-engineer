@@ -74,7 +74,7 @@
   --color-emphasis:      var(--color-amber-500);  /* 本文中の強調表現（strong・インラインコード）共通のアクセント。
                                                       syntax-classと同じamber-500を参照するが、
                                                       「本文の強調」と「コード風表示」で用途が異なるため名前を分けている（6-5で統合） */
-  --color-heading:       var(--color-primary);  /* 本文見出し。サイト共通のアクセントグリーンに統一 */
+  --color-heading:       var(--color-primary);  /* 本文の大見出し（.case-study の h2）。h3 は本文の文字色を使う（7-6b） */
   --color-error:         var(--color-red-400);  /* バリデーションエラー表示用（フォームのフィールドエラー等） */
 
   /* ErrorPage（404等）のシンタックスハイライト専用（6-2）。
