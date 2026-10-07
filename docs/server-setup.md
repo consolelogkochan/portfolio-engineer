@@ -1223,7 +1223,7 @@ sed -i 's|^QUEUE_CONNECTION=.*|QUEUE_CONNECTION=sync|' .env
 | `LOG_CHANNEL` | `stack` | 複数のチャンネルを束ねる仕組みを使う。**現在束ねているのは1本だけだが、この形にしておけば、後から束ねる先を増やせる**（異常時だけ別の場所へ送るなど） |
 | `LOG_LEVEL` | `debug` | すべての重大度を記録する。**現状で量が問題になっておらず、`LOG_STACK`を`daily`にしたため溜まっても消える。再検討の条件：ログの量が増えたとき** |
 | `APP_LOCALE` | `en` | **このままで問題ない。** 問い合わせフォームのバリデーションのメッセージは、リクエストのクラスが9件すべて日本語で定義しているため、この値が`en`でも利用者には日本語が出る（実測 2026-09-27）。**再検討の条件：フレームワークの既定のメッセージが利用者に見える場面が出たとき** |
-| `INERTIA_USE_SCRIPT_ELEMENT_FOR_INITIAL_PAGE` | `true` | 初期のページのデータを`<script>`要素で出力する。React側（@inertiajs/react）がv3系で、この形式でしか読まないため。サーバー側（inertia-laravel）はv2で、既定では別の形式で出す。**サーバー側をv3に上げたら不要になる**（v3は常にこの形式）。推測：本番の`.env`にこの値があると考えている（本番は表示できているため）。**本番の`.env`で確かめてはいない** |
+| `INERTIA_USE_SCRIPT_ELEMENT_FOR_INITIAL_PAGE` | `true` | 初期のページのデータを`<script>`要素で出力する。React側（@inertiajs/react）がv3系で、この形式でしか読まないため。サーバー側（inertia-laravel）はv2で、既定では別の形式で出す。**サーバー側をv3に上げたら不要になる**（v3は常にこの形式）。本番の`.env`にこの行があることを確かめた（2026-10-07、`grep -c`で件数だけを確かめた。値の全文は表示していない） |
 | `LOG_DAILY_DAYS` | `35` | 日ごとに分けたログを保持する日数。**月次の確認の間隔をカバーする長さにしている**（40節）。既定の14日では、1ヶ月の間隔で読むと取りこぼす。**コードにも既定値35があるが、19節の方針に従って明示する** |
 
 APP_DEBUG=falseの副作用：エラーの詳細が画面に出なくなるため、問題が起きたときは`storage/logs/laravel.log`を読むことになる。
@@ -3921,6 +3921,7 @@ npm はカレントディレクトリからプロジェクトの `.npmrc` を探
 | 開発機に `gh` が無い | **回収先：7-6c。** 非公開リポジトリの一覧は GitHub の画面で確かめる |
 | **依存が変わるデプロイで、`vendor/` に置かれるファイルのグループが `www-data` にならない** | **回収先：7-6d（7-6c の後、7-7 の前）。7-9 の公開より前に必ず終える。** 実測（2026-10-04）で本番が500になった（30節の【7-6a】）。**制約：`bin/deploy.sh` や CI の中で `sudo` を使って直す形にしない**（CI の鍵に `sudo` を持たせると、鍵が漏れたとき root まで届く。7-4b・7-4d）。調べること：composer が `vendor/` の外のどこでファイルを作っているか（推測の段階）、その場所を setgid の付いた場所にできるか、`sudo` なしでグループの誤りを検出してデプロイを失敗させられるか。検証には依存が変わるデプロイが要る。それまでは30節の暫定の手順で補う。7-6d が済んだら、開発ログ（`content/logs/portfolio-engineer.md`）のフェーズ7の最後の段落『根本の対策は、次の作業で扱っている』を直す |
 | **Inertia のサーバー側（inertia-laravel）を v3 に上げ、README の Inertia の記述を書き直す** | **回収先：7-6d。** 今はサーバー側 v2・React 側 v3 系。公式が保証する組み合わせではない（7-6c の調査）。上げると、19節の `INERTIA_USE_SCRIPT_ELEMENT_FOR_INITIAL_PAGE` が不要になり、存在しない URL の404で共有 props を届ける公式の仕組みが使える見込み（7-6a の回避策を置き換えられる可能性。推測）。依存の変更なので、30節の暫定の手順1・2の対象 |
+| `composer.json` の `name`・`description`・`keywords` が、Laravel の初期のテンプレートの値のまま（`laravel/laravel`、「The skeleton application for the Laravel framework.」、`laravel`・`framework`） | **回収先：7-6d。** 公開リポジトリでは `composer.json` も見られる。動作には影響しない。`name` は `composer.lock` の content-hash に含まれ、変えると `composer.lock` の更新が要る（Composer 2.10.1 の content-hash を計算する処理で確かめた。2026-10-07。`description`・`keywords` は含まれない）。Inertia の更新で `composer.lock` を変えるときに一度に直す（7-6c-1 の報告で見つかった） |
 
 ---
 
