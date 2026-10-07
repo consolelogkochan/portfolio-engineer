@@ -7,7 +7,7 @@
         "laravel",
         "framework"
     ],
-    "license": "MIT",
+    "license": "proprietary",
     "require": {
         "php": "^8.5",
         "inertiajs/inertia-laravel": "^2.0",

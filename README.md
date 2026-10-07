@@ -1,67 +1,59 @@
 # portfolio-engineer
 
-エンジニアとしてのポートフォリオサイト。
-「全体の設計ができた上で、AIによる開発の効率化・自動化を行える」ことを示すことを目的に、
-このサイト自体を一つの作品として、設計・実装の過程を含めて公開しています。
+Kotaro Izaki のポートフォリオサイトのソースコードです。このサイト自体が、設計から本番の運用までを記録しながら作った作品の1つです。
 
 [![CI](https://github.com/consolelogkochan/portfolio-engineer/actions/workflows/ci.yml/badge.svg)](https://github.com/consolelogkochan/portfolio-engineer/actions/workflows/ci.yml)
 
+## このプロジェクトについて
+
+AIの出力はその場限りです。このプロジェクトでは、実装をAIと進めながら、判断の理由を記録し、手順を作り、プロジェクトを進める仕組みを試してきました。
+
+- **判断の理由を残す**：なぜその設計にしたか、いつ見直すかを記録する
+- **更新しやすい**：作品ごとにMarkdownで本文を書き、Gitで管理する
+- **運用まで自分で担う**：本番環境の構築からデプロイ、障害への対応までを自分で行う
+
+判断の理由を記録した例として、本番サーバーの構築と運用の手順書（[docs/server-setup.md](docs/server-setup.md)）を公開しています。設定ごとに、なぜそうしたか、いつ見直すかを書いています。
+
 ## 技術スタック
-- Laravel / Inertia.js
-- React / TypeScript
-- Tailwind CSS
-- 補助: Claude Code
 
-## 構成の特徴
-コンテンツはデータベースではなくMarkdownファイルで管理する
-フラットファイル構成を採用しています。（詳細は開発と共に追記予定）
+| 領域 | 使っているもの |
+| --- | --- |
+| バックエンド | Laravel 13（PHP 8.5） |
+| フロントエンド | Inertia.js、React 19、TypeScript、Tailwind CSS v4 |
+| コンテンツ | Markdown（front matter 付き）、Zod によるスキーマの検証 |
+| 本番環境 | VPS（Ubuntu）、Nginx、PHP-FPM |
+| CI・デプロイ | GitHub Actions |
+| 開発 | Laravel Sail（Docker）、Claude Code、Claude |
 
-## 技術選定の補足
+Inertia.js は、サーバー側のアダプタ（inertia-laravel）が v2、React 側（@inertiajs/react）が v3 系です。
 
-### Tailwind CSS v4（@tailwindcss/vite プラグイン方式）
-Tailwind CSS v4 を採用しています。v4 では設定方式が刷新されており、
-`tailwind.config.js` を使う v3 式ではなく、
-Vite 公式プラグイン（`@tailwindcss/vite`）を `vite.config.js` に追加するだけで動作します。
-v3 式の設定（`tailwind.config.js`、`@tailwind` ディレクティブ等）は混在させません。
+## 構成
 
-### Inertia.js v2（@inertiajs/react v3.x）を採用した理由
-本プロジェクトの目的は「学習・手堅い土台づくりに基づくポートフォリオサイト作成」です。
-最新の v3 より、運用実績・事例・情報量が豊富な v2 の方が
-現時点のプロジェクト方針に合致すると判断し採用しました。
-
-### Inertia.js v2 特有の設定対処
-Inertia.js v2 の JavaScript コア（`@inertiajs/core` v2）は、
-初期ページデータを以下の形式でのみ読み取ります。
-
-```html
-<script data-page="app" type="application/json">{"component":"...",...}</script>
-```
-
-Laravel の `@inertia` ディレクティブはデフォルトでは旧式の
-`<div id="app" data-page="...">` 形式を出力するため、そのままでは
-"Cannot read properties of null (reading 'component')" エラーが発生します。
-
-`.env` に以下を設定することで新形式の出力に切り替えています。
+コンテンツはデータベースを使わず、リポジトリ内のMarkdownファイルで管理しています。作品を追加するときは、ファイルを書いてpushするだけです。
 
 ```
-INERTIA_USE_SCRIPT_ELEMENT_FOR_INITIAL_PAGE=true
-```
-
-## ディレクトリ構成
-
-```
-content/          # サイトのコンテンツ（Markdown）。DBの代わりにファイルで管理
-  works/          # 作品（1作品 = 1 Markdownファイル）
-  logs/           # ビルドログ（開発過程の記事）
+content/          # サイトのコンテンツ（Markdown）
+  works/          # 作品（1作品 = 1ファイル）
+  logs/           # 開発ログ（作品と同じ名前のファイルで対応づける）
+  about.md        # About ページ
 app/
-  Services/       # ビジネスロジック（Markdownのパース、画像処理など）
-  Exceptions/     # アプリケーション独自の例外（ContentNotFoundException など）
+  Services/       # Markdownの読み込みとHTMLへの変換、メタ情報の組み立て、画像の最適化など
 resources/js/
-  Pages/          # Inertiaのページ（URLと1対1で対応）
-  types/          # TypeScript型定義
-scripts/          # コンテンツ検証など、ビルド補助スクリプト
+  Pages/          # Inertiaのページ
+  Components/     # 画面の部品
+scripts/          # コンテンツの検証（Zod）
+docs/
+  server-setup.md # 本番サーバーの構築と運用の手順書（判断の理由と、見直す条件を含む）
+bin/              # デプロイと巻き戻しのスクリプト
+.github/workflows/ # CI とデプロイ
 ```
+
+## 品質の確認
+
+コミットの前とCIで、型の検査、lint、整形の確認、テスト、コンテンツの検証、依存の脆弱性の検査を行います。デプロイは、CIが緑であることを確かめてから、GitHub Actions から手動で起動します。
 
 ## 利用について
-このリポジトリはポートフォリオ閲覧・学習参考を目的に公開しています。
-コードの閲覧・参考はご自由にどうぞ。無断での複製・転用はご遠慮ください。
+
+このリポジトリには、オープンソースのライセンスを付けていません。コードの閲覧・参考はご自由にどうぞ。無断での複製・転用はご遠慮ください。
+
+© 2026 Kotaro Izaki
