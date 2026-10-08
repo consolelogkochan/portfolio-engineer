@@ -3919,7 +3919,7 @@ npm はカレントディレクトリからプロジェクトの `.npmrc` を探
 | 項目 | 補足 |
 | --- | --- |
 | 画像を 7-7 で入れるまで、作品の `thumbnail` は既存の仮の画像のパスを、slug `portfolio-engineer` もそのまま維持する | **回収先：7-6b。** `PageMetaTest` が slug を名指しし、og:image の実ファイルを検査するため（コードからの読み取り） |
-| GitHub のプロフィールや README からサイトへのリンクは、今は Basic 認証で止まる | **回収先：7-6c。** 上の行（プロフィールからフォームへ誘導する）は、本切り替え（41-5）まで成立しない |
+| GitHub のプロフィールや README からサイトへのリンクは、今は Basic 認証で止まる | **回収先：7-6c。** プロフィールからフォームへ誘導する方針（41-9 に移した行）は、本切り替え（41-5）まで成立しない |
 | **依存が変わるデプロイで、`vendor/` に置かれるファイルのグループが `www-data` にならない** | **回収先：7-6d（7-6c の後、7-7 の前）。7-9 の公開より前に必ず終える。** 実測（2026-10-04）で本番が500になった（30節の【7-6a】）。**制約：`bin/deploy.sh` や CI の中で `sudo` を使って直す形にしない**（CI の鍵に `sudo` を持たせると、鍵が漏れたとき root まで届く。7-4b・7-4d）。調べること：composer が `vendor/` の外のどこでファイルを作っているか（推測の段階）、その場所を setgid の付いた場所にできるか、`sudo` なしでグループの誤りを検出してデプロイを失敗させられるか。検証には依存が変わるデプロイが要る。それまでは30節の暫定の手順で補う。7-6d が済んだら、開発ログ（`content/logs/portfolio-engineer.md`）のフェーズ7の最後の段落『根本の対策は、次の作業で扱っている』を直す |
 | **Inertia のサーバー側（inertia-laravel）を v3 に上げ、README の Inertia の記述を書き直す** | **回収先：7-6d。** 今はサーバー側 v2・React 側 v3 系。公式が保証する組み合わせではない（7-6c の調査）。上げると、19節の `INERTIA_USE_SCRIPT_ELEMENT_FOR_INITIAL_PAGE` が不要になり、存在しない URL の404で共有 props を届ける公式の仕組みが使える見込み（7-6a の回避策を置き換えられる可能性。推測）。依存の変更なので、30節の暫定の手順1・2の対象 |
 | `composer.json` の `name`・`description`・`keywords` が、Laravel の初期のテンプレートの値のまま（`laravel/laravel`、「The skeleton application for the Laravel framework.」、`laravel`・`framework`） | **回収先：7-6d。** 公開リポジトリでは `composer.json` も見られる。動作には影響しない。`name` は `composer.lock` の content-hash に含まれ、変えると `composer.lock` の更新が要る（Composer 2.10.1 の content-hash を計算する処理で確かめた。2026-10-07。`description`・`keywords` は含まれない）。Inertia の更新で `composer.lock` を変えるときに一度に直す（7-6c-1 の報告で見つかった） |
