@@ -25,8 +25,6 @@ AIの出力はその場限りです。このプロジェクトでは、実装を
 | CI・デプロイ | GitHub Actions |
 | 開発 | Laravel Sail（Docker）、Claude Code、Claude |
 
-Inertia.js は、サーバー側のアダプタ（inertia-laravel）が v2、React 側（@inertiajs/react）が v3 系です。
-
 ## 構成
 
 コンテンツはデータベースを使わず、リポジトリ内のMarkdownファイルで管理しています。作品を追加するときは、Markdownのファイルを書いてコミットします。データベースや管理画面の操作は要りません。
