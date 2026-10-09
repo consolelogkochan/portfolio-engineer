@@ -88,6 +88,24 @@
   echo "==> composer install"
   composer install --no-dev --optimize-autoloader --no-interaction
 
+  echo "==> vendor のグループの確認"
+  # 依存が変わると、composer が置いたファイルのグループが www-data にならず、
+  # 本番が500になったことがある（30節の【7-6a】）。deploy.yml は終了コードしか
+  # 見ないため、ここで数えて失敗にする。直す処理は入れない（自動で直すと、
+  # ずれが起きたこと自体が見えなくなる）。直し方は30節の暫定の手順2。
+  # find が失敗したときは、0件と区別できなくならないよう、その場で止める。
+  if ! drift="$(find "${root}/vendor" \( ! -group www-data -o ! -perm -g+r -o -type d ! -perm -g+s \) -print)"; then
+    echo "vendor/ のずれを数えられませんでした。" >&2
+    exit 1
+  fi
+  if [ -n "$drift" ]; then
+    echo "vendor/ に、グループが www-data でない・グループが読めない・setgid の無いものが $(printf '%s\n' "$drift" | wc -l) 件あります（先頭の5件）：" >&2
+    sed -n '1,5p' <<< "$drift" >&2
+    echo "直し方は docs/server-setup.md の30節「暫定の手順（7-6a）」の手順2を参照してください。" >&2
+    exit 1
+  fi
+  echo "ずれ 0 件"
+
   echo "==> 成果物の配置"
   release="${root}/releases/${stamp}"
   mv "$incoming" "$release"
