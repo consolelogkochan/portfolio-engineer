@@ -26,6 +26,7 @@
 /releases
 /storage/*.key
 /storage/pail
+/storage/inertia-devtools
 /vendor
 _ide_helper.php
 Homestead.json
