@@ -199,6 +199,8 @@ chmod 600 /home/<USER>/.ssh/authorized_keys
 
 **期待する出力**：`groups <USER>` に `sudo` が含まれること。
 
+2026-10-09 から、`<USER>` は www-data の補助グループにも属する（22節）。
+
 ### 判断と注意
 
 - ユーザー名に `admin` / `user` / `ubuntu` / `deploy` などのありふれた名前を使わない
@@ -1228,7 +1230,7 @@ sed -i 's|^QUEUE_CONNECTION=.*|QUEUE_CONNECTION=sync|' .env
 
 APP_DEBUG=falseの副作用：エラーの詳細が画面に出なくなるため、問題が起きたときは`storage/logs/laravel.log`を読むことになる。
 
-注意：`storage/logs/laravel.log` は www-data が所有し、php-fpm の umask に従って 660 で作られる（16節）。`<USER>` は www-data グループに属していないため（30節の実測）、sudo なしでは読めない。
+注意：`storage/logs/laravel.log` は www-data が所有し、php-fpm の umask に従って 660 で作られる（16節）。`<USER>` は www-data グループに属していなかったため（30節の実測 2026-08-23）、sudo なしでは読めなかった。2026-10-09 から www-data の補助グループに属するため（22節）、sudo なしで読める見込みである（確かめていない）。下の `sudo` 付きのコマンドは、そのまま使える。
 
 ```bash
 sudo tail -50 /var/www/portfolio/storage/logs/laravel.log
@@ -1479,6 +1481,13 @@ setgid を全ディレクトリに付ける理由：デプロイで新しく作�
 実測（2026-09-04）：対象は 2003 ディレクトリ。付与後に touch で作ったファイルのグループが www-data になることを確認した。
 
 実測（2026-09-04）：setgid は新しいディレクトリへ継承される。`storage/framework/cache/data/` 配下に www-data が実行時に作ったディレクトリ（`4c`、`fa`）が `drwxrws---` で setgid を持っていた。一度付ければ、以後デプロイで作られるディレクトリにも自動的に付く。
+
+**作業用ユーザーを www-data の補助グループに入れた（2026-10-09、7-6d）。** `sudo usermod -aG www-data <USER>` を実行し、ログインし直して `id -Gn | tr ' ' '\n' | grep -cx www-data` が `1` になることを確かめた。それまでは属していなかった（30節の実測 2026-08-23）。
+
+- 理由：属していないと、`<USER>` が www-data のグループのディレクトリに `chmod` したとき、setgid が黙って落ちる（30節の `chmod(2)` の制約）。依存が変わるデプロイで、composer が展開に使う `unzip` がこの形で setgid を落とし、`vendor/` のファイルのグループが `<USER>` になった（30節の【7-6a】と、その訂正）。属していれば、この落ち方が起きない（開発用のコンテナでの実験。2026-10-09。本番では未確認）
+- 増える権限：`<USER>` は、すでに sudo を持ち、`/var/www/portfolio` の所有者でもある。www-data のグループの権限（php-fpm が作る 660 のログやセッションなど）が加わっても、できることは実質的に増えないと判断した。15節が警戒する連鎖（www-data を取られたところから `<USER>` を経て root に届く）は、向きが逆のため、この変更では生まれないと考えている（推測）。CI の鍵は `command=` で `bin/deploy.sh` しか動かせない（30節）
+- 採らなかった方法：composer に `unzip` を使わせない（PHP の zip 拡張で展開させる）。composer の文書化されていない選び方に依存するため
+- 6節・19節・30節で「属していない」を前提にしていた箇所は、ここを指す
 
 `-exec ... +` を使う理由：`\;` は見つかったパスごとに `chmod` を起動する。`+` はまとめて渡すため、2003 件でも起動が数回で済む（出典：find(1)）。
 
@@ -1843,7 +1852,7 @@ sudo chmod g-w,o-rwx /var/www/portfolio/bootstrap/cache/.gitignore
 さらに実測により以下が判明した（2026-08-23）：
 
 - サーバーのumaskは`0002`
-- `<USER>`のプライマリグループは`<USER>`であり、**www-dataグループには属していない**
+- `<USER>`のプライマリグループは`<USER>`であり、**www-dataグループには属していない**（2026-10-09 から補助グループとして属する。22節）
 - `/var/www/portfolio`以下のディレクトリに**setgidは付いていない**（storageとbootstrap/cacheを除く）
 
 したがって、新規作成されるファイルのグループは`<USER>`になる。
@@ -1883,6 +1892,8 @@ sudo chmod g-w,o-rwx /var/www/portfolio/bootstrap/cache/.gitignore
 
 【7-6a】実測（2026-10-04）：依存が変わるデプロイで、この場面が初めて起きた。**誤っていた。** composer が置いた `vendor/` のファイル2615件がグループ `<USER>`・setgid なしになり、www-data が読めず、本番が500になった（Nginx のエラーログで、`vendor/` の autoload の読み込みで止まっていることを確認）。権限のビット（640・750）は設計どおりだった。推測：setgid もグループも引き継いでいないことから、composer は `vendor/` の外でファイルを作ってから移している（composer の内部の動きは確かめていない）。
 
+【訂正（7-6d）】上の推測は誤っていた。Composer 2.9.5 は、zip を `vendor/composer/<乱数>/` の中でシステムの `unzip` で展開し、`rename()` で `vendor/<パッケージ>` へ移す（ソースで確かめた。2026-10-09）。展開も `vendor/` の中で行われる。`unzip` が作ったディレクトリの setgid が落ち、その中に作られたファイルが `<USER>` のグループになった。`<USER>` が www-data に属していると起きない（開発用のコンテナでの実験。2026-10-09）。`unzip` が作ったディレクトリに `chmod` して、この節の `chmod(2)` の制約で setgid が落ちる、という内部の流れは推測である（`unzip` のソースは読んでいない）。対策として `<USER>` を www-data の補助グループに入れた（22節）。
+
 **予測した壊れ方は当たっていた。しかし `deploy.yml` は成功と表示し、人がブラウザで開くまで気づかなかった。** この判断を下した 7-4b の時点では、人がサーバーで `bin/deploy.sh` を実行し、その後にサイトの応答を確かめていた（上の実測 2026-09-04 の記録）。7-4d でデプロイを CI に移したとき、デプロイの後にサイトを見る人がいなくなったが（この節の「スクリプトの設計判断」）、この判断は見直されなかった。
 
 この節の「暫定の手順（7-6a）」の手順2と同じ操作で直した。根本の対策は 7-6d で扱う（41-10）。
@@ -1907,12 +1918,17 @@ sudo chmod g-w,o-rwx /var/www/portfolio/bootstrap/cache/.gitignore
 6. 成果物に同梱されたコミットと `origin/main` が一致することを確認する（不一致なら何も変えずに中止）
 7. `git merge --ff-only origin/main`
 8. `composer install`（`--no-dev --optimize-autoloader`）
-9. 成果物を `releases/<タイムスタンプ>/` に置き、`public/build` の symlink をそこへ張り替える
-10. `config:cache` / `route:cache` / `view:cache`
-11. Config / Routes / Views の3つが CACHED であることを確認する
-12. 保持する世代（5つ）を超えた古い `releases/` を削除する
+9. `vendor/` のずれ（グループが www-data でない・グループが読めない・setgid の無いディレクトリ）を数え、1件以上なら失敗で終える（直さない）
+10. 成果物を `releases/<タイムスタンプ>/` に置き、`public/build` の symlink をそこへ張り替える
+11. `config:cache` / `route:cache` / `view:cache`
+12. Config / Routes / Views の3つが CACHED であることを確認する
+13. 保持する世代（5つ）を超えた古い `releases/` を削除する
 
 権限の再適用は行わない。umask 027 と setgid（22節）により、作られる時点で満たされるためである。`releases/` とその配下も、`/var/www/portfolio` から setgid とグループ（www-data）を継承する。sudo は1つも使わない。
+
+**`vendor/` のずれの検出（7-6d）。** 手順9は、依存が変わるデプロイで本番が500になった件（この節の【7-6a】）を受けて足した。`deploy.yml` は終了コードしか見ないため、ずれをここで失敗として表示する。直す処理を入れないのは、自動で直すと、ずれが起きたこと自体が見えなくなるためである。`find` が失敗したときは、0件と区別できなくならないよう、その場で失敗で終える。
+
+手順9で失敗したときの本番の状態：コードは手順7で新しくなり、`vendor/` も手順8で置き換わっている。`public/build` は前の世代のまま、`config:cache` などは作り直されていない（`composer install` は configキャッシュを破棄する。この節の「判断の理由」）。ずれがあれば、www-data が `vendor/` を読めず、サイトは500になっている。直し方は「暫定の手順（7-6a）」の手順2で、ずれを0件にしてから同じコミットで `Deploy` をもう一度起動する（依存は入り終わっているため、`composer install` は `vendor/` に新しいファイルを置かず、手順9を通る見込み。確かめていない）。主経路（revert して通常どおりデプロイ）だけを先に行うと、`composer install` が古い依存を置き直し、ずれが再び起きうる。
 
 この一覧は `bin/deploy.sh` と同じ内容を2箇所に持っている。一覧を消せば重複は消滅するが、bash を読まずに何が起きるか分かる価値を優先し、承知のうえで残している。スクリプトを変更したときは、この一覧も直す必要がある（40節の維持依存の索引に記載）。中身は `bin/deploy.sh` を参照。
 
@@ -1925,7 +1941,7 @@ sudo chmod g-w,o-rwx /var/www/portfolio/bootstrap/cache/.gitignore
 依存が変わるデプロイで本番が500になった（2026-10-04。この節の【7-6a】）。根本の対策（7-6d）が済むまで、次の3つで補う。
 
 1. **デプロイの前**に、本番の現在のコミットを控え（この節の「失敗したときの巻き戻し」）、`main` までの間に**依存が変わるコミット**（`composer.lock` または `package-lock.json` が変わるもの）が挟まっていないかを確かめる。挟まっていれば、**それを先に単独でデプロイする。** 理由：1回のデプロイに複数の変更が入ると、本番で壊れたときに原因を絞り込めない。2026-10-04 の500では、7-6a の変更と依存の更新のどちらが原因かを、ログで切り分ける必要があった
-2. **`composer.lock` が変わったデプロイの後**は、サーバーで `find /var/www/portfolio/vendor \( ! -group www-data -o ! -perm -g+r \) | wc -l` を実行し、`vendor/` のグループを確かめる。0 でなければ、`sudo chgrp -R www-data /var/www/portfolio/vendor` と `sudo find /var/www/portfolio/vendor -type d ! -perm -g+s -exec chmod g+s {} +` で直し、もう一度 0 になることを確かめる。パスを付けずに別のディレクトリで実行すると、`find` が失敗しても `wc -l` は `0` を出し、0件と数えられなかったことが同じ表示になる（実測 2026-10-07）。**これは人が SSH で入って手で行う。** `bin/deploy.sh` や CI からは行わない（CI の鍵に `sudo` を持たせないため。7-4b・7-4d の判断）
+2. **`composer.lock` が変わったデプロイの後**は、サーバーで `find /var/www/portfolio/vendor \( ! -group www-data -o ! -perm -g+r -o -type d ! -perm -g+s \) | wc -l` を実行し、`vendor/` のグループを確かめる。0 でなければ、`sudo chgrp -R www-data /var/www/portfolio/vendor` と `sudo find /var/www/portfolio/vendor -type d ! -perm -g+s -exec chmod g+s {} +` で直し、もう一度 0 になることを確かめる。パスを付けずに別のディレクトリで実行すると、`find` が失敗しても `wc -l` は `0` を出し、0件と数えられなかったことが同じ表示になる（実測 2026-10-07）。**これは人が SSH で入って手で行う。** `bin/deploy.sh` や CI からは行わない（CI の鍵に `sudo` を持たせないため。7-4b・7-4d の判断）
 3. **デプロイの後**は、ブラウザでトップを開いて表示されることを確かめる。`deploy.yml` は終了コードしか見ないため（この節の「GitHub Actions からの起動（7-4d）」の判定できる範囲）
 
 **見直しの条件**：手順1と2は、7-6d で根本の対策が済んだら見直す。手順3は、41-5 で `deploy.yml` に応答確認を足したら見直す。
@@ -2007,7 +2023,7 @@ sudo chmod g-w,o-rwx /var/www/portfolio/bootstrap/cache/.gitignore
 
 7-4b で手作業の `git pull` をしたとき、`bin/` と `bin/deploy.sh` に `umask 0002` 由来のグループ書き込み権が付いていた（`bin/` が 2775、`bin/deploy.sh` が 775）。`command=` がこのファイルを指すことになり、php-fpm のワーカー（www-data）が `command=` の対象を書き換えられる状態だったため、7-4d で `bin/` を 2750、`bin/deploy.sh` を 750 に直した。
 
-あわせて記録する制約：`chmod` で setgid を付けるには権限が要る。`chmod(2)` に「呼び出しプロセスが特権を持たず、ファイルのグループがプロセスの実効グループ ID または補助グループ ID のいずれとも一致しない場合、S_ISGID ビットはオフにされるが、これはエラーの返却を引き起こさない」とある。作業用ユーザーは www-data グループに属していない（22節）ため、`sudo` なしで `chmod 2750` を実行すると **setgid が黙って落ちる**。22節の setgid 付与で `sudo find ...` を使っているのはこの制約による。
+あわせて記録する制約：`chmod` で setgid を付けるには権限が要る。`chmod(2)` に「呼び出しプロセスが特権を持たず、ファイルのグループがプロセスの実効グループ ID または補助グループ ID のいずれとも一致しない場合、S_ISGID ビットはオフにされるが、これはエラーの返却を引き起こさない」とある。作業用ユーザーは www-data グループに属していない（22節）ため、`sudo` なしで `chmod 2750` を実行すると **setgid が黙って落ちる**。22節の setgid 付与で `sudo find ...` を使っているのはこの制約による。2026-10-09 から作業用ユーザーは www-data の補助グループに属するため（22節）、作業用ユーザーにはこの制約が当てはまらなくなった。制約そのものは、依存が変わるデプロイで `vendor/` のグループがずれた原因の説明として残す（この節の【7-6a】の訂正）。
 
 実測（2026-09-14）：7-4e で新設した `bin/rollback.sh` も、何もしなくても `bin/deploy.sh` と同じ 750（`-rwxr-x---`、所有者・グループは `<USER>:www-data`）になっていた。**違っていないことが要点である。** 22節の setgid とデプロイ時の `umask 027` により、新しく作られるファイルが作られる時点で正しい権限になるという設計が、新規ファイルにもそのまま効いている実例にあたる。
 
