@@ -1,16 +1,12 @@
 {
     "$schema": "https://getcomposer.org/schema.json",
-    "name": "laravel/laravel",
+    "name": "consolelogkochan/portfolio-engineer",
     "type": "project",
-    "description": "The skeleton application for the Laravel framework.",
-    "keywords": [
-        "laravel",
-        "framework"
-    ],
+    "description": "Kotaro Izaki のポートフォリオサイトのソースコード",
     "license": "proprietary",
     "require": {
         "php": "^8.5",
-        "inertiajs/inertia-laravel": "^2.0",
+        "inertiajs/inertia-laravel": "^3.0",
         "intervention/image": "^4.1",
         "laravel/framework": "^13.8",
         "laravel/tinker": "^3.0",
