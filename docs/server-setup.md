@@ -537,11 +537,17 @@ composer.json に `ext-*` の明示的な記載はないため、パッケージ
 
 `spatie/laravel-image-optimizer` は、PHPの拡張ではなくサーバーにインストールされたコマンドを呼び出して動く。
 
-しかし `OptimizeImages` コマンドは開発環境のプレコミットで実行され、生成されたwebpファイルはgitにコミットされ、デプロイ時点で揃っている。サーバーの役割は「置く」と「返す」であって「作る」ではない。
+しかし `OptimizeImages` コマンド（`images:optimize`）は開発環境で手動で実行し、生成されたwebpファイルはgitにコミットされ、デプロイ時点で揃っている。サーバーの役割は「置く」と「返す」であって「作る」ではない。
 
 副次的な利益として、インストールするソフトウェアが減れば攻撃面が減り、更新対象も減る。
 
 ※ パッケージ自体は `composer install` で本番にも入るが、実行しないため害はない。
+
+【訂正（7-7a）】当初この判断は、このコマンドを開発環境のプレコミットで実行すると記載していたが、誤りである。手順書を実物に合わせ、手動で実行する形を正とする。プレコミットには入れない。
+
+- 実測（2026-10-11）：プレコミットのフック、lint-staged の設定、`package.json` に、`images:optimize` が入ったことは一度も無い。`git log -p --all -- .husky/pre-commit lint-staged.config.js package.json` の出力に該当が無く、`git log --oneline --all -S 'images:optimize' -- .husky lint-staged.config.js package.json` も0件だった
+- 再検討の条件：変換を忘れたことで、本番の表示が壊れたとき
+- 気づく経路：作品の `thumbnail` と OGP 既定画像は、CI のテスト（`PageMetaTest`）が実ファイルの有無を検査するため気づける。`gallery` とアバターの画像は、7-7b で検査を足すまで、画面を見たときにしか気づけない
 
 ### 判断3：`php8.5-intl` は入れない
 
