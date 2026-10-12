@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
+use App\Services\ContentParser;
 use App\Services\ContentRepository;
+use Mockery;
 use Tests\TestCase;
 
 /**
@@ -222,6 +224,70 @@ class PageMetaTest extends TestCase
             $response = $this->get("/works/{$work['slug']}");
             $response->assertOk();
             $this->assertOgImageFileExists((string) $response->getContent(), "works/{$work['slug']}");
+        }
+    }
+
+    /**
+     * 全ページの og:image が png/jpg であることを検証する（7-7b）。
+     * SNSのプレビューの bot の一部は webp に対応しないため（OptimizeImages のコメント参照）。
+     * 作品の thumbnail（webp）が og:image に紛れ込んでいないかの見張りも兼ねる。
+     */
+    public function test_og_image_is_png_or_jpg_for_all_pages(): void
+    {
+        $repository = app(ContentRepository::class);
+        $paths = ['/', '/works', '/about', '/contact'];
+        foreach ($repository->listPublishedWorks() as $work) {
+            $paths[] = "/works/{$work['slug']}";
+        }
+        foreach ($repository->listPublishedLogs() as $log) {
+            $paths[] = "/logs/{$log['slug']}";
+        }
+
+        foreach ($paths as $path) {
+            $response = $this->get($path);
+            $response->assertOk();
+            $ogImage = $this->extractMeta((string) $response->getContent(), 'property', 'og:image');
+            $this->assertMatchesRegularExpression(
+                '#\.(png|jpe?g)$#i',
+                (string) $ogImage,
+                "{$path}: og:imageがpng/jpgではない（{$ogImage}）",
+            );
+        }
+    }
+
+    /**
+     * 作品が ogImage を持つとき、作品詳細と同じslugの開発ログの og:image がそれに替わることを検証する（7-7b）。
+     * 今は ogImage を持つ作品が無く、上書きの経路が一度も使われないため、getWork の戻り値だけを差し替えて確かめる。
+     */
+    public function test_work_og_image_overrides_default_on_work_and_log_pages(): void
+    {
+        $repository = app(ContentRepository::class);
+        $work = $repository->getWork('portfolio-engineer');
+        $work['frontmatter']['ogImage'] = '/images/og/works/override-test.png';
+
+        // partialMock はコンストラクタを呼ばず ContentParser が入らないため、引数を渡して部分モックを作る
+        $mock = Mockery::mock(ContentRepository::class, [app(ContentParser::class)])->makePartial();
+        $mock->shouldReceive('getWork')->with('portfolio-engineer')->andReturn($work);
+        $this->instance(ContentRepository::class, $mock);
+
+        $expected = rtrim((string) config('app.url'), '/').'/images/og/works/override-test.png';
+        foreach (['/works/portfolio-engineer', '/logs/portfolio-engineer'] as $path) {
+            $response = $this->get($path);
+            $response->assertOk();
+            $this->assertSame($expected, $this->extractMeta((string) $response->getContent(), 'property', 'og:image'), $path);
+        }
+    }
+
+    /**
+     * 作品が ogImage を持たないとき、作品詳細と開発ログの og:image がサイトの既定になることを検証する（7-7b）。
+     */
+    public function test_work_and_log_pages_use_default_og_image_without_work_og_image(): void
+    {
+        $expected = rtrim((string) config('app.url'), '/').config('page_meta.default_og_image');
+        foreach (['/works/portfolio-engineer', '/logs/portfolio-engineer'] as $path) {
+            $response = $this->get($path);
+            $response->assertOk();
+            $this->assertSame($expected, $this->extractMeta((string) $response->getContent(), 'property', 'og:image'), $path);
         }
     }
 

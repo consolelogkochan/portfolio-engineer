@@ -24,8 +24,8 @@ export default function Home({ featuredWorks, pageTitle }: Props) {
         {/* 3行キャッチ：1行目を強く、3行目を控えめにして階層をつける。
             ただし3行目はサイトの核心（AIとの協働プロセス）なので、抑えつつも読める大きさは確保する。
             スマホ2xl／タブレット4xl／PC6xlで、ヒーローだけ大きくジャンプさせて主張を強める。
-            h1の文面は、homeのdescription（config/page_meta.php）とOGP既定画像
-            （public/images/og/default.png）に写されている。h1を変えたときは、両方も直すこと（7-6a） */}
+            h1の文面は、homeのdescription（config/page_meta.php）に写されている。h1を変えたときは、そちらも直すこと（7-6a）。
+            OGP既定画像（public/images/og/site.png）はh1ではなく作品のsummaryの写しにした（7-7b） */}
         <h1 className="text-2xl md:text-4xl lg:text-6xl font-bold text-primary leading-snug mb-4">
           AIと作る。判断は、自分で。
         </h1>

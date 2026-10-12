@@ -41,13 +41,14 @@ class LogController extends Controller
 
         $hasRelatedWork = $this->repository->hasPublishedWork($slug);
 
-        // OGP画像：対応作品（同slug）があればそのthumbnailを使う。無ければnullのまま、
+        // OGP画像：対応作品（同slug）があり、その作品が ogImage を持つときはそれを使う。無ければnullのまま、
         // PageMetaBuilder側のデフォルトOGP画像（config('page_meta.default_og_image')）に委ねる。
+        // thumbnail（webp・正方形）は og:image に向かないので使わない（7-7b）。
         $ogImage = null;
         if ($hasRelatedWork) {
             try {
                 $work = $this->repository->getWork($slug);
-                $ogImage = $work['frontmatter']['thumbnail'] ?? null;
+                $ogImage = $work['frontmatter']['ogImage'] ?? null;
             } catch (ContentNotFoundException|ContentParseException) {
                 // hasPublishedWorkの直後でも稀に競合しうる。失敗時はプレースホルダにフォールバック
             }

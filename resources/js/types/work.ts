@@ -36,6 +36,14 @@ export const WorkSchema = z.object({
   // カード幅はグリッド列数で変わる（PC3列で幅270px程度〜モバイル1列で画面幅）ため、
   // 正方形に近い比率（例: 1200x1200程度）・被写体は中央寄せで用意すると崩れにくい。
   thumbnail: z.string(),
+  // 作品詳細と、同じslugの開発ログの og:image（SNSで共有したときの画像）。任意。
+  // 省略時はサイトの既定（config/page_meta.php の default_og_image）を使う。thumbnail は使わない（7-7b）。
+  // og:image は webp に対応しないプレビューの bot があるため png/jpg に限る。
+  // images:optimize の対象外の public/images/og/works/<slug>.png に置く（1200×630）。
+  ogImage: z
+    .string()
+    .regex(/\.(png|jpe?g)$/i, 'png/jpg で指定（og:image は webp を避ける）')
+    .optional(),
   hero: z.string().optional(),
   gallery: z.array(GalleryItemSchema).default([]),
   metrics: z.array(MetricSchema).optional(),

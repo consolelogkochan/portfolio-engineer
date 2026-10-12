@@ -20,8 +20,12 @@ return [
     |--------------------------------------------------------------------------
     | ogImageが未指定のページで使うフォールバック画像（相対パス）。
     | PageMetaBuilder がconfig('app.url')基点で絶対URL化する。
+    | このサイトに関するページ（作品 portfolio-engineer とそのログを含む）は全てこの画像を使う。
+    | 作品ごとに変えたいときは、作品の front matter に ogImage を書く（7-7b）。
+    | 画像の文字は content/works/portfolio-engineer.md の title と summary の写しである。
+    | summary を変えたときは、この画像も作り直すこと（7-7b）。
     */
-    'default_og_image' => '/images/og/default.png',
+    'default_og_image' => '/images/og/site.png',
 
     /*
     |--------------------------------------------------------------------------

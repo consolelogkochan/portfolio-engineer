@@ -55,7 +55,9 @@ class WorkController extends Controller
         $meta = $this->pageMeta->build('works.show', [
             'title' => $result['frontmatter']['title'] ?? null,
             'description' => $result['frontmatter']['summary'] ?? '',
-            'ogImage' => $result['frontmatter']['thumbnail'] ?? null,
+            // 作品の ogImage（任意）。無ければ null のまま、サイトの既定のOGP画像に委ねる。
+            // thumbnail（webp・正方形）は og:image に向かないので使わない（7-7b）
+            'ogImage' => $result['frontmatter']['ogImage'] ?? null,
             'ogType' => 'article',
         ]);
 

@@ -3,6 +3,7 @@ title: "portfolio-engineer"
 category: "個人開発"
 status: "公開中"
 featured: true
+# summary は OGP既定画像（public/images/og/site.png）に写している。変えたら画像も作り直す（7-7b）
 summary: "AIと実装し、判断の理由を記録しながら、設計から本番の運用までを進めたポートフォリオサイト。このサイト自身が作品です。"
 publishedAt: "2026-10-05"
 period:
