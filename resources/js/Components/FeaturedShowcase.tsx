@@ -125,7 +125,8 @@ function FeaturedCard({ work, loading }: { work: WorkSummary; loading: 'eager' |
       )}
 
       {/* グラデーションオーバーレイ：画像下部を暗くしてテキストを読みやすくする（装飾のみ、Linkは含まない。WorkCardと同じ手法） */}
-      <div className="absolute inset-x-0 bottom-0 top-1/3 bg-linear-to-t from-background/95 via-background/85 to-transparent" />
+      {/* 始まりは上から1/2（7-7b。文字は66.7%から始まる。1/3からだと画像の中央の要素の下側が暗く沈んだため） */}
+      <div className="absolute inset-x-0 bottom-0 top-1/2 bg-linear-to-t from-background/95 via-background/85 to-transparent" />
 
       {/* テキスト＆当たり判定コンテナ：inset-0でカード全体を占め、flexで内容を下寄せする（WorkCardと同じ手法）。
           Linkのafter:inset-0はこのdiv（＝カード全体と同じ範囲）を基準にするため、当たり判定は常にカード全体になる。 */}

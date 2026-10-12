@@ -32,9 +32,9 @@ export const WorkSchema = z.object({
   aiTools: z.array(z.string()).default([]),
   liveUrl: z.url().optional(),
   repoUrl: z.url().optional(),
-  // 一覧(WorkCard)ではh-96(384px)固定・object-coverで中央クリップ表示される。
-  // カード幅はグリッド列数で変わる（PC3列で幅270px程度〜モバイル1列で画面幅）ため、
-  // 正方形に近い比率（例: 1200x1200程度）・被写体は中央寄せで用意すると崩れにくい。
+  // 正方形（1200x1200）で用意する。一覧(WorkCard)ではカードの幅の正方形（PCの3列は4:5の枠）として上端に置き、
+  // ショーケース(FeaturedCard)ではobject-coverで中央を切り抜く。どちらも下に文字が乗るため、
+  // 要素は横の中央、縦は中央よりやや上（上から約35〜56%）にまとめる（7-7b。docs/server-setup.md の40節）。
   thumbnail: z.string(),
   // 作品詳細と、同じslugの開発ログの og:image（SNSで共有したときの画像）。任意。
   // 省略時はサイトの既定（config/page_meta.php の default_og_image）を使う。thumbnail は使わない（7-7b）。
