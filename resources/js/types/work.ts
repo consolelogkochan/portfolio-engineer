@@ -38,7 +38,7 @@ export const WorkSchema = z.object({
   thumbnail: z.string(),
   // 作品詳細と、同じslugの開発ログの og:image（SNSで共有したときの画像）。任意。
   // 省略時はサイトの既定（config/page_meta.php の default_og_image）を使う。thumbnail は使わない（7-7b）。
-  // og:image は webp に対応しないプレビューの bot があるため png/jpg に限る。
+  // og:image は png/jpg に限る。webp に対応しないプレビューの bot がある、という前提に従う（未確認。OptimizeImages のコメント）。
   // images:optimize の対象外の public/images/og/works/<slug>.png に置く（1200×630）。
   ogImage: z
     .string()
