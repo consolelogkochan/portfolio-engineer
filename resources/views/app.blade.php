@@ -3,6 +3,15 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    {{-- サイトのアイコン（7-7c）。書き方は HTML の仕様の link rel=icon の例に従う。
+         sizes・type は利用者の環境がアイコンを選ぶための手がかり（仕様上は助言）。
+         favicon.ico と apple-touch-icon.png は、ブラウザや OS が決まったパスで取りに来るため、
+         差し替えるときも同じ名前のまま置き換える（画像の名前の規則の例外。docs/server-setup.md の40節）。
+         SVG は link からしか指さないので、差し替えるときは新しい名前で置き、ここを書き換える。 --}}
+    <link rel="icon" href="/favicon.ico" sizes="16x16 32x32 48x48" type="image/vnd.microsoft.icon" />
+    <link rel="icon" href="/favicon-v1.svg" sizes="any" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" sizes="180x180" />
     @viteReactRefresh
     @vite('resources/js/app.tsx')
 
