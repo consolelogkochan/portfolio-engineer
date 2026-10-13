@@ -2726,6 +2726,8 @@ server {
 
 `/etc/nginx/sites-available/portfolio`を次の内容に置き換える。
 
+実測（2026-10-13）：本番の `/etc/nginx/sites-available/portfolio` の全文（`sudo cat -n` の出力）と、このブロックを1行ずつ突き合わせ、本番の文面に合わせた（コメント・空行・並びを含む）。突き合わせた後の差分は0件。ただし、画像とアイコンの location の後の空行は、本番では空白だけの行である（動作には関わらない）。
+
 ```nginx
 # 80番は「443番への転送」と「証明書の更新の通り道」だけを担う。
 #
@@ -2745,8 +2747,6 @@ server {
     }
 
     # $host を使えるのは server_name が完全一致だからである。
-    # 受け皿のように任意の名前を受けるブロックで $host を使うと、
-    # 相手が名乗った文字列をそのまま転送先に書くことになる。
     location / {
         return 301 https://$host$request_uri;
     }
@@ -2755,37 +2755,18 @@ server {
 server {
     listen 443 ssl;
     listen [::]:443 ssl;
+    http2 on;
 
     server_name new.ikshowcase.site;
 
     # fullchain.pem はサーバー証明書と中間証明書を連結したもの。
-    # cert.pem を指定すると中間証明書が欠け、一部の環境で検証に失敗する。
     # いずれも live/ のリンク側を指す（更新のたびに実体が入れ替わるため）。
     ssl_certificate     /etc/letsencrypt/live/new.ikshowcase.site/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/new.ikshowcase.site/privkey.pem;
 
-    # HTTP/2、暗号化の約束の再利用、圧縮、セキュリティヘッダの判断・実測は39節を参照。
-    http2 on;
-
+    # 2回目以降の訪問で、暗号化の約束を短縮できる。
     ssl_session_cache   shared:SSL:10m;
     ssl_session_timeout 1h;
-
-    gzip_types
-        text/css
-        text/plain
-        text/xml
-        text/javascript
-        application/javascript
-        application/json
-        application/xml
-        image/svg+xml;
-    gzip_vary on;
-    gzip_min_length 256;
-    gzip_comp_level 5;
-
-    add_header X-Content-Type-Options "nosniff" always;
-    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
-    add_header X-Frame-Options "DENY" always;
 
     # ドキュメントルートは public/ を指す。
     # これにより .env / app/ / vendor/ は Nginx から到達できない。
@@ -2797,18 +2778,72 @@ server {
     # Nginx のバージョンをレスポンスヘッダとエラーページから隠す
     server_tokens off;
 
+    # 圧縮の対象。text/html は Nginx が常に圧縮するため書かない。
+    # 現れていない種別（text/javascript など）も含めているのは、
+    # 書きすぎの代償がゼロである一方、書き漏らしは黙って無圧縮になるため。
+    # 画像（image/png など）は既に圧縮されており、縮まないので含めない。
+    gzip_types
+        text/css
+        text/plain
+        text/xml
+        text/javascript
+        application/javascript
+        application/json
+        application/xml
+        image/svg+xml;
+
+    # 中間のキャッシュが、圧縮版と非圧縮版を取り違えないようにする
+    gzip_vary on;
+
+    # 小さいものは圧縮しても縮まない（ヘッダの分で増えることもある）
+    gzip_min_length 256;
+
+    # 既定は 1。このサーバーは負荷に余裕があるため上げる。
+    gzip_comp_level 5;
+
+    # ブラウザへの依頼。サーバー側では潰せないものだけをここに書く。
+    # always を付けるのは、既定では成功時の応答にしか付かないため。
+    # このサイトは 401 を多く返すので、付けないと大半の応答に乗らない。
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+    add_header X-Frame-Options "DENY" always;
+
     # 公開前の暫定措置。中身が揃い apex へ切り替える 7-9 で外す。
     auth_basic "Restricted";
     auth_basic_user_file /etc/nginx/.htpasswd;
 
-    # ビルド成果物はファイル名に内容のハッシュを含むため、期限を無限にできる（39節）。
-    # add_header は location に1つでも書くと server 側が継承されないため、
-    # 必要なヘッダをここに書き直している（39節・判断5）。
+    # ビルド成果物は、ファイル名が内容から算出されている。
+    # 内容が変われば名前も変わるため、期限を無限にしてよい。
+    #
+    # 【注意】add_header は、この location に1つでも書くと
+    # server ブロックの add_header が継承されなくなる。しかも黙って消える。
+    # したがって、必要なヘッダをここにも書き直している。
     location ^~ /build/ {
         add_header Cache-Control "public, max-age=31536000, immutable" always;
         add_header X-Content-Type-Options "nosniff" always;
         add_header Referrer-Policy "strict-origin-when-cross-origin" always;
         add_header X-Frame-Options "DENY" always;
+    }
+
+    # 画像は名前にハッシュが無いため、期限を7日にとどめ、immutable は付けない（39節）。
+    # add_header ではなく expires で付ける。location に add_header を書くと、
+    # server のセキュリティのヘッダが継承されなくなるため（39節・判断5）。
+    # ファイルが無ければ Laravel に回さず、Nginx が404を返す。
+    location /images/ {
+        expires 7d;
+        try_files $uri =404;
+    }
+
+    # 決まったパスで取りに来るアイコンは、同じ名前のまま差し替えるため、
+    # 使う前に毎回確かめさせる（40節）。返し方は location / と同じ。
+    location = /favicon.ico {
+        expires -1;
+        try_files $uri $uri/ /index.php?$query_string;
+    }
+
+    location = /apple-touch-icon.png {
+        expires -1;
+        try_files $uri $uri/ /index.php?$query_string;
     }
 
     # 静的ファイルが実在すればそれを返し、なければ index.php に渡す
@@ -2820,6 +2855,7 @@ server {
     location ~ \.php$ {
         include snippets/fastcgi-php.conf;
         fastcgi_pass unix:/run/php/php-fpm.sock;
+        fastcgi_read_timeout 60s;
     }
 
     # ドットファイルへのアクセスを拒否する。
@@ -2836,7 +2872,36 @@ sudo systemctl reload nginx
 
 `nginx -t`は証明書のファイルも実際に開く。パスが誤っていればここで止まる。通ってからreloadする。
 
-**`location ~ \.php$`のブロックに`fastcgi_read_timeout 60s;`を明示している**（2026-09-27に追加）。**値はNginxの既定値と同じであり、変えるために書いたのではない。**
+**画像とアイコンの location を足した**（7-7d、2026-10-13）。判断は39節の判断2 と判断5 に置く。実測（2026-10-13）：変更の前（12:46 JST）と後（12:56 JST）に、8つの URL の応答ヘッダを `curl -sI` で測った。
+
+- 変更後、`/images/` の下の画像に `Cache-Control: max-age=604800`、`/favicon.ico` と `/apple-touch-icon.png` に `Cache-Control: no-cache` が付いた
+- 8つすべてに、セキュリティのヘッダ3つが残った
+- `/build/` の下、トップのページ、`/favicon-v1.svg` の応答は変わらなかった
+- 存在しない画像のパスは、Laravel のエラーページではなく、Nginx の404を返すようになった
+- `/images/` の下のドットファイル（`.gitkeep`）は、変更の前後とも 403 だった
+
+**画像の location に `^~` を付けない理由**（7-7d）：`^~` を付けると、`/images/` の下では正規表現の location が調べられなくなる（出典：nginx.org の `ngx_http_core_module` の `location` の文書。https://nginx.org/en/docs/http/ngx_http_core_module.html#location ）。そうなると、ドットファイルを拒否する location が `/images/` の下で効かなくなり、`/images/` の下の `.gitkeep` が読めるようになる。`^~` が無ければ正規表現が先に調べられ、ドットファイルの拒否と `.php` の扱いは、画像の location を足す前と同じになる。本番のファイルには、この理由のコメントが無い（足すときに入らなかった）ため、ここに書く。
+
+**本番のファイルに無い説明**（このブロックの以前の記録にあったコメント。本番に合わせたときにブロックから外し、ここに移した）
+
+- 80番のブロック：`$host` を使えるのは `server_name` が完全一致だからである。受け皿のように任意の名前を受けるブロックで `$host` を使うと、相手が名乗った文字列をそのまま転送先に書くことになる（7-3d-2b）
+- `ssl_certificate` に `cert.pem` を指定すると中間証明書が欠け、一部の環境で検証に失敗する。そのため `fullchain.pem` を指している（7-3d-2b）
+- HTTP/2、暗号化の約束の再利用、圧縮、セキュリティのヘッダの判断と実測は、39節にある（7-3d-4）
+- `/build/` の下のビルド成果物は、ファイル名に内容のハッシュを含むため、期限を無限にできる（39節）。`add_header` は location に1つでも書くと server の側が継承されないため、`/build/` の location に必要なヘッダを書き直している（39節・判断5）（7-3d-4）
+
+**本番と、このブロックを突き合わせる手段**（7-7d）
+
+```bash
+sudo cat -n /etc/nginx/sites-available/portfolio
+```
+
+出力を、このブロックと**全文で**比べる（行番号を除いて `diff` にかけるなど）。語で絞る `grep`（`listen`・`location` などを含む行だけを出すもの）は、「見たい行があるか」の確認であり、「一致するか」の確認には使えない。比べなかった行の食い違いを見逃すためである。
+
+実測（2026-10-13）：7-7d で設定を変える前に、語で絞る `grep` で突き合わせ、食い違いは無いと判断した。変えた後に全文で比べたところ、指令2つ（`fastcgi_read_timeout 60s;` と、画像とアイコンの location）と、多数のコメント・並びが食い違っていた。指令の食い違いは、2026-09-27 に本番に足した `fastcgi_read_timeout 60s;` を、このブロックに足していなかったものである。コメントの食い違いは、7-3d-4 以降に生じたと読める（本番のコメントは、手順書と git の履歴に無い）。
+
+本番の設定が正で、このブロックは写しである。写しは手で合わせるしかない（41-12）。
+
+**`location ~ \.php$`のブロックに`fastcgi_read_timeout 60s;`を明示している**（2026-09-27に追加）。**値はNginxの既定値と同じであり、変えるために書いたのではない。** 上の設定のブロックへの反映は、2026-10-13（7-7d）に行った。
 
 **書いた理由**：実測（2026-09-27）：明示する前は`/etc/nginx/`のどこにもこの設定が無く、**Nginxの既定値に依存していた。** その既定値はこちらの管理下になく、**変わっても気づく経路が無い。** そして16節のタイムアウトの順序は、この値が60秒であることの上に立っている。**書いておけば、こちらの管理下に入る。**
 
@@ -3435,6 +3500,25 @@ app-BqLPbuc1.css
 
 `/images/`には付けない。ファイル名にハッシュが無く、内容が変わっても名前が変わらないため。画像の扱いは7-7で決める。
 
+【7-7d で決めた（2026-10-13）】`/images/` と、決まったパスのアイコン2つに、キャッシュの指示を付けた。設定は36節にある。
+
+- **`/images/` の下：期限を7日にする**（`expires 7d;` → `Cache-Control: max-age=604800`）。`immutable` は付けない
+  - 理由：ヘッダが無いと、ブラウザは `Last-Modified` から期限を推定してよく、期限が成り行きで決まる（出典：RFC 9111 §4.2.2。https://www.rfc-editor.org/rfc/rfc9111.html#section-4.2.2 ）
+  - 差し替えるときは新しい名前で置く規則（40節）があるので、期限を延ばしても古い画像は出にくい。ただし規則は人が守るもので、破ったときに閲覧者の手元に古い画像が残る期間を7日に抑える
+  - 名前にハッシュが無いので、`immutable` は付けない
+- **`/favicon.ico` と `/apple-touch-icon.png`：使う前に毎回確かめさせる**（`expires -1;` → `Cache-Control: no-cache`）
+  - 理由：この2つは同じ名前のまま差し替える（40節）。**ヘッダを付けないことは、期限が短いことを意味しない。** 推定の期限は `Last-Modified` からの経過に比例する（出典：RFC 9111 §4.2.2）ので、長く変えずにいるほど、差し替えた後に古いアイコンが長く残る
+  - `ETag` があるので、確かめる通信は小さい（実測 2026-10-13：2つとも `ETag` が返る）
+- **存在しない画像のパスには、Laravel に回さず Nginx が404を返す。** 画像は HTML のページではなく、`<img>` が読み込むもので、404 の本文をサイトの見た目にする必要が無い
+- `<link>` からだけ指すアイコンの SVG は対象にしない。命名の規則に従い、差し替えれば名前が変わるため
+
+**再検討の条件**（`/images/` の7日）
+
+1. 7-9 の Performance の実測で、画像のキャッシュの期限が短いと指摘されたとき
+   - 気づく経路：(b) 定期的に見る場所に出る。7-9 で Performance を測る予定がある（41-5）
+2. 命名の規則を破って、同じ名前で画像を上書きしたことが、一度でも起きたとき
+   - 気づく経路：(c) 人が指摘する。上書きを機械で検出する仕組みは無い。CI で `public/images/` の既存のファイルの変更（`git diff --diff-filter=M`）を検出すれば (a) に移せる見込み（推測）だが、移すかは決めていない（7-7d の時点）
+
 ### 判断3：HTTP/2と、暗号化の約束の再利用
 
 - 実測：設定前はHTTP/1.1、設定後はHTTP/2
@@ -3520,6 +3604,13 @@ Permissions-Policyが守る相手は、自分のコードではなく、注入�
 （このときの確認コマンドは記録していない。再確認する場合は、`/build/` 配下と `/` のレスポンスヘッダを比較する）
 
 したがって、必要なヘッダをlocationにも書き直している。重複するが、黙って消えるよりよい。
+
+【7-7d（2026-10-13）】**`expires` は、この継承の規則の対象外である。** location に `expires` だけを書き、`add_header` を書かなければ、server のセキュリティのヘッダは継承されたまま残る。
+
+- 出典：nginx.org の `add_header` の文書は、継承の条件を "These directives are inherited from the previous configuration level if and only if there are no add_header directives defined on the current level." とし、条件に `expires` を含めない（https://nginx.org/en/docs/http/ngx_http_headers_module.html#add_header 。読み取り。「`expires` は対象外」と明示した文は無い）
+- 実測（2026-10-13）：`expires` だけを書いた3つの location（`/images/`・`/favicon.ico`・`/apple-touch-icon.png`）の応答と、存在しない画像の404に、セキュリティのヘッダ3つが返った
+
+したがって、画像とアイコンのキャッシュの指示は `add_header` ではなく `expires` で付けた（36節）。`/build/` の4行の書き直しは変えていない。`expires` では `public` と `immutable` を付けられないため（出典：同じ文書の `expires` の項。付くのは `max-age` か `no-cache`）。
 
 ### 判断6：robots.txtの圧縮で増える件は、対処しない
 
@@ -3722,6 +3813,8 @@ PNGが圧縮されないことの確認になる。対象に入れていない�
   変換（13節）で作る webp は変換元の名前を引き継ぐため、変換元を新しい名前で置けば足りる。実測（2026-10-11、git の履歴）：これまでに同じ名前で中身を上書きした画像は、OGP 既定画像の1件だけである（7-2）。
 
   **例外**：ブラウザや OS が決まったパスで取りに来るファイル（`/favicon.ico`、`/apple-touch-icon.png`）は、同じ名前のまま差し替える（7-7c）。名前を変えると取りに来てもらえない。Google 検索も favicon の URL を頻繁に変えないよう求めている（出典：Google Search Central の favicon の文書。2026-10-13 に確認）。条件：この2つには長いキャッシュの期限を付けない（同じ名前で差し替えたとき、古い画像が長く残らないように。7-7d で扱う）。`<link>` からだけ指すアイコンの SVG（`favicon-v1.svg`）は、この項目の規則に従う。差し替えるときは新しい名前（`favicon-v2.svg` など）で置き、`resources/views/app.blade.php` の `<link>` を書き換え、古いファイルを同じコミットで消す。
+
+  **この規則が、`/images/` の7日の期限を支えている**（39節、7-7d）。規則を守れば、差し替えた画像は新しい名前で配られるため、期限の長さは古い画像の残りに効かない。規則を破ったときに閲覧者の手元に古い画像が残るのは、最長で7日である。例外の2つ（`/favicon.ico`・`/apple-touch-icon.png`）は、使う前に毎回確かめさせる指示（`no-cache`）にした（39節）。長いキャッシュの期限を付けないという 7-7c の条件は、これで満たされた。
 - **og:image の画像は `public/images/og/` に PNG（1200×630）で置く。** 既定は `og/site.png`（全ページ共通）。作品ごとに替えるときは `og/works/<slug>.png` に置き、作品の front matter の `ogImage` で指す。その作品詳細と、同じ slug の開発ログが替わる（7-7b）。
 
   **理由**：SNS のプレビューの bot の一部は webp に対応しない（推測：`OptimizeImages` のコメントに依拠し、確かめていない）。そのため og 用の画像は変換（13節）の対象外にしている。`ogImage` は png/jpg 以外をコンテンツの検証で弾く。
@@ -3790,10 +3883,7 @@ PNGが圧縮されないことの確認になる。対象に入れていない�
 
 7-7a で、7-7 を 7-7a（方針と整理）・7-7b（差し替え）・7-7c（アイコン）・7-7d（画像の配信）に分けた。画像を差し替えるときの名前の付け方は40節に置いた。
 
-| 回収先 | 項目 | 補足 |
-| --- | --- | --- |
-| 7-7d | `/images/` にキャッシュの指示が無い | ファイル名にハッシュが無いため長期の期限は付けられないが、何も付けないままでよいかは判断していない（39節と対になる判断）。差し替えるときは新しい名前で置く規則（40節）を前提に判断する。7-7c からの条件：`/favicon.ico` と `/apple-touch-icon.png` は同じ名前のまま差し替えるので、長いキャッシュの期限を付けない（40節）。Nginx の favicon のログの設定（`log_not_found` など）を検討する（今は favicon 専用の location が無い。36節） |
-| 7-7c | GitHub のプロフィールのアイコン | 7-7a で 7-7 の範囲に足した。GitHub の設定の画面で行う作業で、リポジトリのファイルは変わらない。**「K」のマークに決定（7-7c）。アップロード待ち**：favicon と同じ図案（背景は角の無い正方形、「K」は内側の円に収まる大きさ）の 500×500 の PNG を、本人が GitHub の画面でアップロードし、公開 API で反映を確かめる |
+**回収する行は残っていない。** 7-7d で最後の行を解決し、41-9 へ移した。7-7 の回収は終わった（2026-10-13）。
 
 ---
 
@@ -3843,6 +3933,7 @@ curl -si -u 'nosuchuser:wrong-password' https://new.ikshowcase.site/
 | CSP の設定 | 許可すべき読み込み先は、実コンテンツと画像が入った後でないと確定しない（`Permissions-Policy` は 41-7 で「入れない」と確定した） |
 | 監視の設定 | 40節を参照。監視が要るのは「落ちて困る状態」になったときであり、7-3d の時点では対象が存在しなかった |
 | **問い合わせフォームの汎用エラー文面（送信失敗時）に、代わりの連絡手段が書かれていない** | **訪問者は失敗したことは分かるが、次の手が無い**（19節） |
+| Performance の実測で、画像のキャッシュの期限について指摘が出るかを見る | 39節の判断2 の再検討の条件。`/images/` の下は7日にしている（7-7d） |
 
 > 証明書の自動更新が失敗した場合、それが表面化するのは証明書の有効期間が切れたときである（出典：有効期間は90日。37節に出典を記載）。加えて、失敗を知らせる通知は設定していない（実測：37節）。このため、**その検知手段だけは監視全般と切り離して先に用意した**（37節）。
 
@@ -3980,6 +4071,10 @@ npm はカレントディレクトリからプロジェクトの `.npmrc` を探
 | About のアバター画像（41-4 にあったもの） | 7-7b で解決（2026-10-12）。7-7a の判断のとおり、今の画像をそのまま使う。表示の大きさに合わせた縮小は行わない。再検討の条件は 7-7a のまま（応募や個人での案件の受注を始めるとき）。画像の実在はコンテンツの検証が確かめる（上の行） |
 | favicon が無い（41-4 にあったもの） | 7-7c で解決（2026-10-13）。JetBrains Mono（SIL OFL 1.1。字形を図形にしてロゴなどに使うことは OFL の FAQ で認められている）の「K」の字形を図形にした SVG（`favicon-v1.svg`）、16・32・48px を収めた `favicon.ico`、180px の `apple-touch-icon.png`（角なし）を置き、全ページ共通のテンプレートに `<link>` を3つ置いた。SVG を使わない相手（Google 検索は形式の一覧に SVG を挙げていない）のために ICO と PNG も置いた。`favicon.ico` と `apple-touch-icon.png` は名前の規則の例外（40節）。テスト（`FaviconTest`）が `<link>` の出力と、ファイルの実在・中身を確かめる。ブラウザのタブでの見え方は、デプロイの後に確かめる |
 
+| `/images/` にキャッシュの指示が無い（41-4 にあったもの） | 7-7d で解決（2026-10-13）。`/images/` の下に7日の期限を付けた。`immutable` は付けていない。判断と再検討の条件は39節の判断2、設定は36節 |
+| `/favicon.ico` と `/apple-touch-icon.png` に長いキャッシュの期限を付けない（41-4 にあったもの。7-7c からの条件） | 7-7d で解決（2026-10-13）。2つとも使う前に毎回確かめさせる指示（`no-cache`）にした（39節・40節）。実測（2026-10-13）：2つとも `Cache-Control: no-cache` が返る |
+| Nginx の favicon のログの設定（`log_not_found` など）を検討する（41-4 にあったもの） | 7-7d で、変えないと決めた（2026-10-13）。アイコンのファイルが実在するので、アイコンへの要求が404としてログに出ることは無い（推測：本番のログは見ていない）。再検討の条件：アイコンへの要求の記録がログを読みにくくしていると感じたとき。気づく経路は (c) ログを読む人が気づく。なお、存在しない画像のパスは Nginx が404を返すようになったので、その要求は Nginx のエラーログに残りうる（推測：既定で、見つからないファイルの記録が有効なため） |
+| GitHub のプロフィールのアイコン（41-4 にあったもの） | 7-7c で決め、本人がアップロードし、公開 API で反映を確かめた（2026-10-13）。GitHub の側で 460×460 に縮められ、斜めの線の縁が少しぎざぎざになっているが、拡大しないと分からないため受け入れた。再検討の条件：実際の表示の大きさで、縁のぎざぎざが気になったとき（460×460 で上げ直すことを試す） |
 ---
 
 ### 41-10. 7-6（実コンテンツ投入）で回収する
@@ -4025,3 +4120,4 @@ npm はカレントディレクトリからプロジェクトの `.npmrc` を探
 | 他のプロジェクトから見て、このサーバーをどう扱うべきかを、共有できる形でファイル化する | 7-4h から。前回の引き継ぎプロンプトにだけあった項目を移した（2026-10-10） |
 | 統一ログの参照性が低い | 日々の統一ログに埋もれて、後から設計を引けない。サイトの「開発ログ」のページとは別。前回の引き継ぎプロンプトにだけあった項目を移した（2026-10-10） |
 | Resend のキーの棚卸し | 無料プランの送信上限との関係もここで扱う（37節。7-5c-2 から）。前回の引き継ぎプロンプトにだけあった項目を移した（2026-10-10） |
+| Nginx の設定の正を、リポジトリの中のファイルに置くか（サーバーへは、そのファイルを置く形にするか）を判断する | 今の正はサーバーの上にあり、36節は写しで、手で合わせるしかない。7-7d で、36節と本番が食い違っていた（指令2つと多数のコメント。36節）。今回は変えない（7-7d） |
