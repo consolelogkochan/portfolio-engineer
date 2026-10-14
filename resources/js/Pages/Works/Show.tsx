@@ -88,26 +88,50 @@ export default function Show(props: Props) {
                 </a>
               </Field>
             )}
-            {repoUrl && (
-              <Field label="リポジトリ">
+          </Card>
+
+          {/* 開発ログは一覧のページが無く、作品詳細からしか辿れない。見落とされないよう、
+              作品の情報のカードとは別の区画として置き、何が見られるかを1行で添える。
+              Card は p-6 固定で、行ごとの当たり判定を区画の端まで広げられないため、Card と同じトークンを直接使う。
+              ホバーでは、他の文字のリンクと同じく名前に下線を引く */}
+          {(hasRelatedLog || repoUrl) && (
+            <div className="bg-surface border border-border rounded-lg divide-y divide-border">
+              {hasRelatedLog && (
+                <Link
+                  href={`/logs/${slug}`}
+                  className="group flex items-center justify-between gap-4 px-6 py-4"
+                >
+                  <span>
+                    <span className="block font-bold text-primary group-hover:underline">
+                      開発ログ
+                    </span>
+                    <span className="block text-sm text-text-muted">開発の経緯と判断の記録</span>
+                  </span>
+                  <span aria-hidden="true" className="text-primary text-xl">
+                    →
+                  </span>
+                </Link>
+              )}
+              {repoUrl && (
                 <a
                   href={repoUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-primary hover:underline"
+                  className="group flex items-center justify-between gap-4 px-6 py-4"
                 >
-                  GitHubで見る
+                  <span>
+                    <span className="block font-bold text-primary group-hover:underline">
+                      GitHub
+                    </span>
+                    <span className="block text-sm text-text-muted">ソースコードと変更の履歴</span>
+                  </span>
+                  <span aria-hidden="true" className="text-primary text-xl">
+                    ↗
+                  </span>
                 </a>
-              </Field>
-            )}
-            {hasRelatedLog && (
-              <Field label="開発ログ">
-                <Link href={`/logs/${slug}`} className="text-primary hover:underline">
-                  開発の記録を見る
-                </Link>
-              </Field>
-            )}
-          </Card>
+              )}
+            </div>
+          )}
         </div>
 
         <div>
