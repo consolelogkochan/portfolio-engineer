@@ -35,13 +35,14 @@ content/          # サイトのコンテンツ（Markdown）
   logs/           # 開発ログ（作品と同じ名前のファイルで対応づける）
   about.md        # About ページ
 app/
-  Services/       # Markdownの読み込みとHTMLへの変換、メタ情報の組み立て、画像の最適化など
+  Services/       # Markdownの読み込みとHTMLへの変換、メタ情報の組み立て、画像のWebPへの変換（php artisan images:optimize で手動で実行する）
 resources/js/
   Pages/          # Inertiaのページ
   Components/     # 画面の部品
 scripts/          # コンテンツの検証（Zod）
 docs/
   server-setup.md # 本番サーバーの構築と運用の手順書（判断の理由と、見直す条件を含む）
+  ledger.md       # 持ち越しの台帳（後で扱う項目、解決した項目、扱わないと決めた記録）
 bin/              # デプロイと巻き戻しのスクリプト
 .github/workflows/ # CI とデプロイ
 ```
