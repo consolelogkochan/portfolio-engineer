@@ -43,6 +43,7 @@ scripts/          # コンテンツの検証（Zod）
 docs/
   server-setup.md # 本番サーバーの構築と運用の手順書（判断の理由と、見直す条件を含む）
   ledger.md       # 持ち越しの台帳（後で扱う項目、解決した項目、扱わないと決めた記録）
+  environment.md  # 環境の一覧（開発・CI・本番のツールと版、その意図の索引）
 bin/              # デプロイと巻き戻しのスクリプト
 .github/workflows/ # CI とデプロイ
 ```
