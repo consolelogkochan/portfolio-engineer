@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Exceptions\ContentNotFoundException;
+use App\Exceptions\ContentNotPublishedException;
 use App\Exceptions\ContentParseException;
 use App\Services\ContentRepository;
 use App\Services\MarkdownRenderer;
@@ -36,6 +37,9 @@ class WorkController extends Controller
         try {
             $result = $this->repository->getWork($slug);
         } catch (ContentNotFoundException) {
+            abort(404);
+        } catch (ContentNotPublishedException) {
+            // ファイルは存在するが status が 非公開。404で返し、ログは残さない
             abort(404);
         } catch (ContentParseException $e) {
             Log::warning('Work skipped due to parse error', [

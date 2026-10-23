@@ -13,7 +13,8 @@ use Tests\TestCase;
  * サーバーサイドで出力するmeta情報（title/description/OGP/Twitter Card）の検証（7-2）。
  *
  * 固定文言（Home/Works一覧/Contact/Aboutのtitle）はconfig('page_meta')から取得した値と比較する。
- * 動的ページ（作品詳細・ログ詳細・Aboutのdescription）は、7-6で実コンテンツに差し替わるため
+ * 動的ページ（作品詳細・ログ詳細・Aboutのdescription）の文言は content/ の front matter が持つ。
+ * 文言をテストに写すと、コンテンツを書き換えるたびにテストも直すことになるため、
  * 文言そのものは検証せず、meta要素の存在・空でないこと・絶対URL形式であること等の
  * 構造のみを検証する。
  *
@@ -141,8 +142,8 @@ class PageMetaTest extends TestCase
 
     public function test_works_show_page_has_required_meta_tags(): void
     {
-        // 作品詳細はtitle/description/ogImageがすべてfrontmatter由来の動的値（7-6で実コンテンツに
-        // 差し替わる）。文言そのものは検証せず、構造のみを検証する。
+        // 作品詳細はtitle/description/ogImageがすべてfrontmatter由来の動的値（コンテンツの書き換えで
+        // 変わる）。文言そのものは検証せず、構造のみを検証する。
         $response = $this->get('/works/portfolio-engineer');
         $response->assertOk();
         $html = (string) $response->getContent();

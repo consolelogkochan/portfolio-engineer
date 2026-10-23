@@ -18,7 +18,9 @@ const GalleryItemSchema = z.object({
 export const WorkSchema = z.object({
   title: z.string(),
   category: z.enum(['個人開発', '受託', '新規事業']),
-  status: z.enum(['公開中', '開発中']),
+  // 非公開の作品は、一覧・トップ・sitemap・開発ログからのリンクに出さず、詳細も404を返す（ContentRepository）。
+  // 開発の途中の作品は載せない運用で、一度載せたものを一時的に下げるときに使う（7-8b-5）。
+  status: z.enum(['公開中', '非公開']),
   featured: z.boolean().default(false),
   summary: z.string(),
   publishedAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'YYYY-MM-DD形式で記述'),
@@ -44,7 +46,6 @@ export const WorkSchema = z.object({
     .string()
     .regex(/\.(png|jpe?g)$/i, 'png/jpg で指定（og:image は webp を避ける）')
     .optional(),
-  hero: z.string().optional(),
   gallery: z.array(GalleryItemSchema).default([]),
   metrics: z.array(MetricSchema).optional(),
 });

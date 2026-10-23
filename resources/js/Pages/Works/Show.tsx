@@ -15,7 +15,6 @@ export default function Show(props: Props) {
   const {
     title,
     category,
-    status,
     summary,
     period,
     role,
@@ -36,9 +35,7 @@ export default function Show(props: Props) {
       <PageMeta title={pageTitle} />
 
       <h1 className="text-xl md:text-2xl font-bold mb-1">{title}</h1>
-      <p className="text-text-muted text-sm mb-8">
-        {category} ・ {status}
-      </p>
+      <p className="text-text-muted text-sm mb-8">{category}</p>
 
       {gallery.length > 0 && (
         <div className="mb-8">
@@ -53,9 +50,7 @@ export default function Show(props: Props) {
 
           <Card className="space-y-4">
             <Field label="概要">{summary}</Field>
-            <Field label="分類・状態">
-              {category} ・ {status}
-            </Field>
+            <Field label="分類">{category}</Field>
             <Field label="期間">
               {period.start} 〜 {period.end ?? '継続中'}
             </Field>

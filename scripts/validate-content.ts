@@ -53,7 +53,6 @@ for (const file of workFiles) {
   const { data } = matter(readFileSync(file, 'utf-8'));
   checkImage(file, 'thumbnail', data.thumbnail);
   checkImage(file, 'ogImage', data.ogImage);
-  checkImage(file, 'hero', data.hero);
   if (Array.isArray(data.gallery)) {
     data.gallery.forEach((g: { src?: unknown }, i: number) =>
       checkImage(file, `gallery[${i}].src`, g?.src)

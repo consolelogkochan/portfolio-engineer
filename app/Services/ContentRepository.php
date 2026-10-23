@@ -137,16 +137,22 @@ class ContentRepository
 
     /**
      * 単一作品を取得する（show アクション用）。
+     * 公開中でない作品（status が 非公開）は「存在するが非公開」として ContentNotPublishedException を投げる。
      *
      * @return array{frontmatter: array<string, mixed>, body: string}
      *
      * @throws ContentNotFoundException
      * @throws ContentParseException
+     * @throws ContentNotPublishedException
      */
     public function getWork(string $slug): array
     {
         $result = $this->parser->parse(base_path("content/works/{$slug}.md"));
         $result['frontmatter'] = array_merge(self::WORK_DEFAULTS, $result['frontmatter']);
+
+        if (($result['frontmatter']['status'] ?? '') !== '公開中') {
+            throw new ContentNotPublishedException("Unpublished work is not public: {$slug}");
+        }
 
         return $result;
     }

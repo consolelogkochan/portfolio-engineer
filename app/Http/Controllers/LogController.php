@@ -49,7 +49,7 @@ class LogController extends Controller
             try {
                 $work = $this->repository->getWork($slug);
                 $ogImage = $work['frontmatter']['ogImage'] ?? null;
-            } catch (ContentNotFoundException|ContentParseException) {
+            } catch (ContentNotFoundException|ContentParseException|ContentNotPublishedException) {
                 // hasPublishedWorkの直後でも稀に競合しうる。失敗時はプレースホルダにフォールバック
             }
         }
