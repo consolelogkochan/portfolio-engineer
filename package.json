@@ -13,6 +13,7 @@
     "lint:fix": "eslint resources/js --fix",
     "format": "prettier --write resources/js",
     "format:check": "prettier --check resources/js",
+    "check:css-vars": "tsx scripts/check-css-vars.ts",
     "prepare": "husky"
   },
   "devDependencies": {

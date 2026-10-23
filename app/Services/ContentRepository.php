@@ -12,8 +12,9 @@ use Illuminate\Support\Facades\Log;
 class ContentRepository
 {
     /**
-     * types/work.ts の WorkSchema で .default(...) が付くフィールドと同じデフォルト値。
-     * frontmatterにキーが無い場合にフロントへ渡す値をここで一元管理する（単一の真実の源）。
+     * frontmatterにキーが無い項目の既定値。一覧（scanAll）と詳細（getWork）の両方で、画面に渡す前に埋める。
+     * 同じ値が types/work.ts の WorkSchema の .default(...) にもある。TS 側は内容の検証と型のため、
+     * こちらは画面に渡す値のため。変えるときは2か所とも変える（7-8b-5）。
      */
     private const array WORK_DEFAULTS = [
         'featured' => false,
@@ -22,7 +23,8 @@ class ContentRepository
     ];
 
     /**
-     * types/log.ts の LogSchema で .default(...) が付くフィールドと同じデフォルト値。
+     * 開発ログの既定値。WORK_DEFAULTS と同じく、types/log.ts の LogSchema の .default(...) と2か所にある。
+     * 公開の判定（draft）もこの値を埋めた後に行う。
      */
     private const array LOG_DEFAULTS = [
         'tags' => [],
@@ -34,11 +36,12 @@ class ContentRepository
     /**
      * 指定ディレクトリの全.mdを走査してパース済み配列を返す。
      * 壊れた1件はスキップ＆Log::warning（サイトは落とさない）。
-     * slug はファイル名（拡張子なし）として付与する。
+     * slug はファイル名（拡張子なし）として付与し、キーが無い項目には $defaults を埋める。
      *
+     * @param  array<string, mixed>  $defaults
      * @return array<int, array<string, mixed>>
      */
-    public function scanAll(string $dir): array
+    public function scanAll(string $dir, array $defaults): array
     {
         if (! is_dir($dir)) {
             return [];
@@ -50,7 +53,7 @@ class ContentRepository
             $slug = basename($path, '.md');
             try {
                 $result = $this->parser->parse($path);
-                $items[] = array_merge(['slug' => $slug], $result['frontmatter']);
+                $items[] = array_merge(['slug' => $slug], $this->withDefaults($result['frontmatter'], $defaults));
             } catch (ContentNotFoundException|ContentParseException $e) {
                 Log::warning('Content skipped during scan', [
                     'path' => $path,
@@ -63,13 +66,25 @@ class ContentRepository
     }
 
     /**
+     * frontmatter にキーが無い項目へ既定値を入れる。キーがあれば frontmatter の値を優先する。
+     *
+     * @param  array<string, mixed>  $frontmatter
+     * @param  array<string, mixed>  $defaults
+     * @return array<string, mixed>
+     */
+    private function withDefaults(array $frontmatter, array $defaults): array
+    {
+        return array_merge($defaults, $frontmatter);
+    }
+
+    /**
      * 公開中の作品を publishedAt の降順（新しい順）で返す。
      *
      * @return array<int, array<string, mixed>>
      */
     public function listPublishedWorks(): array
     {
-        $works = $this->scanAll(base_path('content/works'));
+        $works = $this->scanAll(base_path('content/works'), self::WORK_DEFAULTS);
 
         $published = array_values(
             array_filter($works, fn (array $w) => ($w['status'] ?? '') === '公開中'),
@@ -93,7 +108,7 @@ class ContentRepository
         return array_values(
             array_filter(
                 $this->listPublishedWorks(),
-                fn (array $w) => ($w['featured'] ?? false) === true,
+                fn (array $w) => $w['featured'] === true,
             ),
         );
     }
@@ -106,10 +121,10 @@ class ContentRepository
      */
     public function listPublishedLogs(): array
     {
-        $logs = $this->scanAll(base_path('content/logs'));
+        $logs = $this->scanAll(base_path('content/logs'), self::LOG_DEFAULTS);
 
         $published = array_values(
-            array_filter($logs, fn (array $l) => ($l['draft'] ?? false) !== true),
+            array_filter($logs, fn (array $l) => $l['draft'] !== true),
         );
 
         usort($published, fn (array $a, array $b) => strcmp($b['publishedAt'] ?? '', $a['publishedAt'] ?? ''),
@@ -148,7 +163,7 @@ class ContentRepository
     public function getWork(string $slug): array
     {
         $result = $this->parser->parse(base_path("content/works/{$slug}.md"));
-        $result['frontmatter'] = array_merge(self::WORK_DEFAULTS, $result['frontmatter']);
+        $result['frontmatter'] = $this->withDefaults($result['frontmatter'], self::WORK_DEFAULTS);
 
         if (($result['frontmatter']['status'] ?? '') !== '公開中') {
             throw new ContentNotPublishedException("Unpublished work is not public: {$slug}");
@@ -170,7 +185,7 @@ class ContentRepository
     public function getLog(string $slug): array
     {
         $result = $this->parser->parse(base_path("content/logs/{$slug}.md"));
-        $result['frontmatter'] = array_merge(self::LOG_DEFAULTS, $result['frontmatter']);
+        $result['frontmatter'] = $this->withDefaults($result['frontmatter'], self::LOG_DEFAULTS);
 
         if ($result['frontmatter']['draft'] === true) {
             throw new ContentNotPublishedException("Draft log is not public: {$slug}");
@@ -218,6 +233,6 @@ class ContentRepository
             return false;
         }
 
-        return ($result['frontmatter']['draft'] ?? false) !== true;
+        return $this->withDefaults($result['frontmatter'], self::LOG_DEFAULTS)['draft'] !== true;
     }
 }

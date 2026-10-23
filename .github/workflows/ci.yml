@@ -63,6 +63,10 @@ jobs:
 
       - run: npm run build
 
+      # CSS の未定義の変数の検査。定義があるかはビルドの成果物で判定するため、ビルドの直後に置く。
+      # 名前を間違えた var(--名前) は、ほかのどの検査も止めず、画面が黙って崩れる（30節）。
+      - run: npm run check:css-vars
+
       # php artisan testはnpm run buildの後に置く：resources/views/app.blade.phpの@vite()が
       # public/build/manifest.jsonを要求するため、ビルド前に実行すると全ページが
       # 「Vite manifest not found」で確実に失敗することを実測で確認した

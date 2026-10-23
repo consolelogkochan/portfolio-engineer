@@ -56,7 +56,7 @@
 | 名前 | 置き場所 | 環境との関わり | 意図 |
 | --- | --- | --- | --- |
 | `laravel/sail` | `composer.json` の `require-dev` | pre-commit のフック（`./vendor/bin/sail npx lint-staged`）と、コンテナの操作が使う。開発用の依存でも、消すとフックが動かない | 台帳 41-9（7-8b-2） |
-| `tsx` | `package.json` の `devDependencies`（`^4.23.15`） | lint-staged と CI の内容の検証（`npx tsx scripts/validate-content.ts`）が使う。依存に無いと、`npx` がその都度取りに行く | 台帳 41-9（7-8b-3） |
+| `tsx` | `package.json` の `devDependencies`（`^4.23.15`） | lint-staged と CI の内容の検証（`npx tsx scripts/validate-content.ts`）と、CSS の変数の検査（`npm run check:css-vars`）が使う。依存に無いと、`npx` がその都度取りに行く | 台帳 41-9（7-8b-3） |
 | `package.json` の `name` | `package.json`（`portfolio-engineer`） | 無いと、コンテナの中で npm を動かしたとき、コンテナのフォルダ名がロックファイルに入る | 台帳 41-9（7-8b-3） |
 
 ## 表3：`.env` の開発と本番の差

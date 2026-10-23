@@ -15,6 +15,8 @@ const GalleryItemSchema = z.object({
   caption: z.string().optional(),
 });
 
+// .default(...) の値（featured・aiTools・gallery）は、画面に渡す値として ContentRepository の WORK_DEFAULTS にもある。
+// 変えるときは2か所とも変える（7-8b-5）。
 export const WorkSchema = z.object({
   title: z.string(),
   category: z.enum(['個人開発', '受託', '新規事業']),
