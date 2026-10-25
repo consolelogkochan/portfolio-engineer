@@ -40,7 +40,8 @@ export const WorkSchema = z.object({
   // 正方形（1200x1200）で用意する。一覧(WorkCard)ではカードの幅の正方形（PCの3列は4:5の枠）として上端に置き、
   // ショーケース(FeaturedCard)ではobject-coverで中央を切り抜く。どちらも下に文字が乗るため、
   // 要素は横の中央、縦は中央よりやや上（上から約35〜56%）にまとめる（7-7b。docs/server-setup.md の40節）。
-  thumbnail: z.string(),
+  // 空の文字列は止める。一覧とショーケースは、代わりの表示を持たずに必ず画像を出す（7-8c）
+  thumbnail: z.string().min(1, '空にしない（画像のパスを書く）'),
   // 作品詳細と、同じslugの開発ログの og:image（SNSで共有したときの画像）。任意。
   // 省略時はサイトの既定（config/page_meta.php の default_og_image）を使う。thumbnail は使わない（7-7b）。
   // og:image は png/jpg に限る。webp に対応しないプレビューの bot がある、という前提に従う（未確認。OptimizeImages のコメント）。

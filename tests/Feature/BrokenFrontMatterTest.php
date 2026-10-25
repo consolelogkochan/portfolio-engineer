@@ -6,6 +6,7 @@ namespace Tests\Feature;
 
 use App\Services\ContentRepository;
 use Illuminate\Support\Facades\File;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 /**
@@ -72,6 +73,36 @@ class BrokenFrontMatterTest extends TestCase
         $this->get('/works')
             ->assertOk()
             ->assertInertia(fn ($page) => $page->where('works.0.slug', 'good')->count('works', 1));
+    }
+
+    /** @return array<string, array{string}> */
+    public static function nonStringDates(): array
+    {
+        return [
+            '数' => ['5'],
+            '配列' => ['[2026-01-02]'],
+            '真偽値' => ['true'],
+        ];
+    }
+
+    /**
+     * 日付が文字列でも日付でもない（数・配列・真偽値）ときも「壊れた1件」として飛ばす。
+     * 作品の publishedAt と、ログの updatedAt で、一覧と存在の確かめを確かめる
+     */
+    #[DataProvider('nonStringDates')]
+    public function test_non_string_dates_are_skipped(string $value): void
+    {
+        $this->putContent('works/good.md', "title: 正しい作品\nstatus: 公開中\npublishedAt: \"2026-01-01\"");
+        $this->putContent('works/bad.md', "title: 壊れた作品\nstatus: 公開中\npublishedAt: {$value}");
+        $this->putContent('logs/good.md', "title: 正しいログ\npublishedAt: \"2026-01-01\"");
+        $this->putContent('logs/bad.md', "title: 壊れたログ\npublishedAt: \"2026-01-02\"\nupdatedAt: {$value}");
+
+        $repository = $this->app->make(ContentRepository::class);
+
+        $this->assertSame(['good'], array_column($repository->listPublishedWorks(), 'slug'));
+        $this->assertSame(['good'], array_column($repository->listPublishedLogs(), 'slug'));
+        $this->assertFalse($repository->hasPublishedWork('bad'));
+        $this->assertFalse($repository->hasPublishedLog('bad'));
     }
 
     /** 引用符の無い日付も YYYY-MM-DD の文字列になり、引用符つきの日付と混ざっても日付の順に並ぶ */

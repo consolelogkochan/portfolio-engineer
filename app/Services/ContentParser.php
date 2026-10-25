@@ -17,6 +17,13 @@ class ContentParser
     /** 最低限存在しなければならないフィールド。値の正当性検証はZodに任せる */
     private const REQUIRED_FIELDS = ['title'];
 
+    /**
+     * 日付の項目。あれば YYYY-MM-DD の文字列でなければならない（並べ替えの strcmp が文字列を前提にする）。
+     * 引用符の無い日付は normalizeDates が文字列に戻す。それでも文字列でない（数・配列・真偽値・空など）
+     * ときは「壊れた1件」とする。形式（YYYY-MM-DD か）の確かめは Zod に任せる
+     */
+    private const array DATE_FIELDS = ['publishedAt', 'updatedAt'];
+
     private readonly FrontMatterParser $parser;
 
     public function __construct()
@@ -47,7 +54,7 @@ class ContentParser
      * @return array{frontmatter: array<string, mixed>, body: string}
      *
      * @throws ContentNotFoundException ファイルが存在しない・読めない場合
-     * @throws ContentParseException frontmatterのパース失敗・連想配列でない・必須フィールド欠落の場合
+     * @throws ContentParseException frontmatterのパース失敗・連想配列でない・日付が文字列でない・必須フィールド欠落の場合
      */
     public function parse(string $path): array
     {
@@ -78,6 +85,12 @@ class ContentParser
         }
 
         $frontmatter = $this->normalizeDates($frontmatter);
+
+        foreach (self::DATE_FIELDS as $field) {
+            if (array_key_exists($field, $frontmatter) && ! is_string($frontmatter[$field])) {
+                throw new ContentParseException("Date field '{$field}' is not a string in: {$path}");
+            }
+        }
 
         // 必須フィールドの最低限存在チェック（値の正当性はZodに任せる）
         foreach (self::REQUIRED_FIELDS as $field) {
