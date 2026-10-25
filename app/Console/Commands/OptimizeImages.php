@@ -16,7 +16,6 @@ class OptimizeImages extends Command
 
     private const SCAN_DIRS = [
         'public/images/works',
-        'public/images/logs',
         'public/images/about',
         // public/images/og は意図的に対象外（5-15でaboutを足したのとは逆の判断）。
         // OGP画像はSNS/チャットのプレビューbot（一部）がwebpに対応していないため、

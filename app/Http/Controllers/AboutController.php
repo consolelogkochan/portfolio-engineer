@@ -34,12 +34,8 @@ class AboutController extends Controller
             abort(404);
         }
 
-        // bodyHtml を dangerouslySetInnerHTML で出力することを許容する根拠：
-        // - ソースは content/about.md（Gitリポジトリ内・著者管理）であり、
-        //   ユーザー入力・外部APIなど未検証データは一切経由しない。
-        // - MarkdownRenderer は html_input=allow だが、
-        //   MarkdownRenderer クラスのdocコメントで「著者管理コンテンツ専用」と明記済み。
-        // - allow_unsafe_links=false により javascript: スキームのリンクは除去される。
+        // bodyHtml（content/about.md）を dangerouslySetInnerHTML で出してよい根拠と、
+        // その前提が崩れる条件は MarkdownRenderer のクラスの説明を参照。
         $meta = $this->pageMeta->build('about', [
             // description=肩書き（titleフィールド）。ogImageは指定せず共通OGP画像に委ねる
             'description' => $result['frontmatter']['title'] ?? '',

@@ -49,13 +49,8 @@ class WorkController extends Controller
             abort(404);
         }
 
-        // bodyHtml を dangerouslySetInnerHTML で出力することを許容する根拠：
-        // - ソースは content/works/*.md（Gitリポジトリ内・著者管理）であり、
-        //   ユーザー入力・外部APIなど未検証データは一切経由しない。
-        // - MarkdownRenderer は html_input=allow だが、
-        //   MarkdownRenderer クラスのdocコメントで「著者管理コンテンツ専用」と明記済み。
-        // - allow_unsafe_links=false により javascript: スキームのリンクは除去される。
-        // この前提が崩れる場合（UGC等）は html_input=strip に変更すること。
+        // bodyHtml（content/works/*.md）を dangerouslySetInnerHTML で出してよい根拠と、
+        // その前提が崩れる条件は MarkdownRenderer のクラスの説明を参照。
         $meta = $this->pageMeta->build('works.show', [
             'title' => $result['frontmatter']['title'] ?? null,
             'description' => $result['frontmatter']['summary'] ?? '',

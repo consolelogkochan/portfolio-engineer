@@ -61,11 +61,8 @@ class LogController extends Controller
             'ogType' => 'article',
         ]);
 
-        // bodyHtml を dangerouslySetInnerHTML で出力することを許容する根拠：
-        // - ソースは content/logs/*.md（Gitリポジトリ内・著者管理）であり、
-        //   ユーザー入力・外部APIなど未検証データは一切経由しない。
-        // - MarkdownRenderer は html_input=allow だが著者管理コンテンツ専用と明記済み。
-        // - allow_unsafe_links=false により javascript: スキームのリンクは除去される。
+        // bodyHtml（content/logs/*.md）を dangerouslySetInnerHTML で出してよい根拠と、
+        // その前提が崩れる条件は MarkdownRenderer のクラスの説明を参照。
         return Inertia::render('Logs/Show', [
             ...$result['frontmatter'],
             'slug' => $slug,

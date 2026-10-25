@@ -132,13 +132,9 @@ export default function Show(props: Props) {
         <div>
           <h2 className="text-sm font-mono text-text-muted mb-2">ケーススタディ</h2>
           {/*
-           * dangerouslySetInnerHTML を許容する根拠：
-           * bodyHtml は WorkController でサーバー側に生成済みの HTML 文字列。
-           * 元データは content/works/*.md（Git管理・著者のみ編集可）であり、
-           * ユーザー入力や外部入力は一切経由しない。
-           * PHP側 MarkdownRenderer の allow_unsafe_links=false により
-           * javascript: リンクは除去されている。
-           * この前提（著者管理コンテンツ）が崩れる場合は使用禁止。
+           * bodyHtml は WorkController がサーバー側で作った HTML（元は content/works/*.md）。
+           * dangerouslySetInnerHTML で出してよい根拠と、その前提が崩れる条件は
+           * app/Services/MarkdownRenderer.php のクラスの説明を参照。
            */}
           <div className="case-study max-w-prose" dangerouslySetInnerHTML={{ __html: bodyHtml }} />
         </div>
