@@ -9,6 +9,11 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    # deploy.yml と同じ書き方（7-8c）。実測では1回40秒ほどなので、15分は止まったときの上限。
+    # 権限はリポジトリの読み取りだけ（checkout が使う）。ほかに GITHUB_TOKEN を使う手順は無い
+    timeout-minutes: 15
+    permissions:
+      contents: read
 
     steps:
       - uses: actions/checkout@v7
