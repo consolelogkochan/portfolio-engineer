@@ -32,16 +32,12 @@ export default function WorkCard({ work }: Props) {
           PC（3列、カード幅約272px）だけは枠を4:5にして、画像の左右を少し切る代わりに1.25倍に写す
           （正方形のままだと画像全体が272pxに縮んで小さいため。1200×1200のうち x≈120〜1080 が写る）。
           タブレット（2列）はカードが横長に近く、縦長の枠にすると要素が下の文字に重なるので正方形のまま。 */}
-      {work.thumbnail ? (
-        <img
-          src={work.thumbnail}
-          alt={work.title}
-          loading="lazy"
-          className="absolute inset-x-0 top-0 w-full aspect-square lg:aspect-[4/5] object-cover"
-        />
-      ) : (
-        <div className="absolute inset-0 bg-surface" />
-      )}
+      <img
+        src={work.thumbnail}
+        alt={work.title}
+        loading="lazy"
+        className="absolute inset-x-0 top-0 w-full aspect-square lg:aspect-[4/5] object-cover"
+      />
 
       {/* グラデーションオーバーレイ：画像下部を暗くしてテキストを読みやすくする（装飾のみ、Linkは含まない） */}
       {/* 始まりは上から1/2（7-7b。タグを1行にして文字が62.8%から始まるようになったため、1/3から下げた） */}
@@ -49,7 +45,7 @@ export default function WorkCard({ work }: Props) {
 
       {/* テキスト＆当たり判定コンテナ：inset-0でカード全体を占め、flexで内容を下寄せする（見た目はグラデーションと同じ位置のまま）。
           Linkのafter:inset-0はこのdiv（＝カード全体と同じ範囲）を基準にするため、当たり判定は常にカード全体になる
-          （グラデーションの見た目top-1/3とは独立しており、暗黙の連動はない）。 */}
+          （グラデーションの見た目の始まり〔top-1/2〕とは独立しており、暗黙の連動はない）。 */}
       <div className="absolute inset-0 flex flex-col justify-end p-4">
         <div className="flex items-start justify-between gap-2 mb-1">
           <h2 className="text-base font-bold leading-snug">

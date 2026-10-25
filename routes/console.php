@@ -1,8 +1,4 @@
 <?php
 
-use Illuminate\Foundation\Inspiring;
-use Illuminate\Support\Facades\Artisan;
-
-Artisan::command('inspire', function () {
-    $this->comment(Inspiring::quote());
-})->purpose('Display an inspiring quote');
+// クロージャで書くコマンドとスケジュールの置き場所（bootstrap/app.php の withRouting の commands）。
+// 今は無い。クラスで書くコマンドは app/Console/Commands に置く（images:optimize）。

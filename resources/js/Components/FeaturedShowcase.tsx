@@ -84,19 +84,15 @@ export default function FeaturedShowcase({ works }: Props) {
 function FeaturedCard({ work, loading }: { work: WorkSummary; loading: 'eager' | 'lazy' }) {
   return (
     // トップ唯一のリッチな展示：primary-lightの淡いグロー＋枠でWorkCard（一覧）より一段格上に見せる
-    // 見送り（5-17記録）：h-104/h-128は固定高。極端に低い横向きビューポートではカード1枚で
-    // 画面縦幅を超えうるが、縦スクロールは許容し実害小と判断。対応タイミング：7-5で実際のコンテンツを見て要判断
+    // 受け入れ（7-8 で判断。docs/ledger.md の 41-9）：h-104/h-128は固定高。極端に低い横向きビューポートでは
+    // カード1枚で画面縦幅を超えうるが、縦スクロールは許容し実害小と判断
     <article className="relative overflow-hidden rounded-lg border border-primary-light/40 bg-surface shadow-[0_0_48px_-16px_var(--color-primary-light)] h-104 md:h-128">
-      {work.thumbnail ? (
-        <img
-          src={work.thumbnail}
-          alt={work.title}
-          loading={loading}
-          className="absolute inset-0 w-full h-full object-cover"
-        />
-      ) : (
-        <div className="absolute inset-0 bg-surface" />
-      )}
+      <img
+        src={work.thumbnail}
+        alt={work.title}
+        loading={loading}
+        className="absolute inset-0 w-full h-full object-cover"
+      />
 
       {/* グラデーションオーバーレイ：画像下部を暗くしてテキストを読みやすくする（装飾のみ、Linkは含まない。WorkCardと同じ手法） */}
       {/* 始まりは上から1/2（7-7b。文字は66.7%から始まる。1/3からだと画像の中央の要素の下側が暗く沈んだため） */}

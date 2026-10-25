@@ -10,33 +10,28 @@ import { Link } from '@inertiajs/react';
 // （区切り文字・サイト名の定義はconfig('page_meta.site_name')の1箇所のまま。ここでは結合するだけ）
 type Props = { status: number; titleSuffix: string };
 
-type StatusContent = { exceptionName: string; comment: string; title: string; description: string };
+type StatusContent = { exceptionName: string; comment: string; title: string };
 
 const STATUS_CONTENT: Record<number, StatusContent> = {
   404: {
     exceptionName: 'PageNotFoundException',
     comment: 'お探しのページは見つかりませんでした',
     title: 'ページが見つかりません',
-    description:
-      'お探しのページは見つかりませんでした。URLをご確認いただくか、トップページからお探しください。',
   },
   403: {
     exceptionName: 'ForbiddenException',
     comment: 'このページにはアクセスできません',
     title: 'アクセスできません',
-    description: 'このページへのアクセス権限がありません。',
   },
   500: {
     exceptionName: 'InternalServerError',
     comment: 'サーバー側で問題が発生しました',
     title: 'サーバーエラー',
-    description: 'サーバー側で問題が発生しました。しばらくしてから再度お試しください。',
   },
   503: {
     exceptionName: 'ServiceUnavailableException',
     comment: '現在メンテナンス中です',
     title: 'メンテナンス中',
-    description: '現在メンテナンス中です。しばらくしてから再度お試しください。',
   },
 };
 
@@ -45,7 +40,6 @@ const FALLBACK_CONTENT: StatusContent = {
   exceptionName: 'UnexpectedErrorException',
   comment: 'エラーが発生しました',
   title: 'エラーが発生しました',
-  description: '予期しないエラーが発生しました。しばらくしてから再度お試しください。',
 };
 
 export default function ErrorPage({ status, titleSuffix }: Props) {

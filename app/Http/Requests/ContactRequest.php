@@ -46,7 +46,8 @@ class ContactRequest extends FormRequest
     /**
      * 中身ベースのスパム判定（3層）。
      * スパムなら理由、正常なら null を返す。
-     * ユーザーにはエラーを見せず、コントローラが静かに弾く。
+     * コントローラは、ボットの特徴（ハニーポット・時間トラップ）は静かに弾き、
+     * 人間が掛かりうる層（トークン・URL数）はエラーを返す（SpamReason::isSilent()）。
      *
      * @return SpamReason|null スパム理由、または null（正常）
      */

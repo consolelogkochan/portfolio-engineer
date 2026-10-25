@@ -22,9 +22,6 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
-        $exceptions->shouldRenderJsonWhen(
-            fn (Request $request) => $request->is('api/*'),
-        );
         // throttle 超過（429）をそのまま返すと Inertia が全画面エラーを表示する。
         // リダイレクト＋flash に変換し、React 側でメッセージを表示する。
         $exceptions->render(function (ThrottleRequestsException $e, Request $request) {

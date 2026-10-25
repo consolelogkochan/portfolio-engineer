@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v7      # → @v7 に変更
+      - uses: actions/checkout@v7
 
       # bin/*.sh の静的検査。ubuntu-latest に最初から入っている shellcheck を使う
       # （インストールのステップは無い）。Node・PHP の準備と独立しているため、
@@ -20,7 +20,7 @@ jobs:
       # ゲートの基準が版で揺れてしまうため対象にしない（30節）。
       - run: shellcheck --severity=warning bin/*.sh
 
-      - uses: actions/setup-node@v7    # → @v7 に変更
+      - uses: actions/setup-node@v7
         with:
           node-version-file: package.json
           cache: npm
@@ -55,8 +55,9 @@ jobs:
       # 1段目：本番に載る依存（--omit=dev）だけを対象に high 以上で失敗させる。
       # 2段目：dev を含む全依存を対象に critical で失敗させる。
       # 本番に載るかどうかで基準を変えている（載るものは厳しく、開発だけのものは緩く）。
-      # 実測（2026-09-06）：1段目・2段目とも 0 件で緑。報告される high 7 件はすべて
-      # devDependencies 由来で、--omit=dev で 0 件になる。背景は docs/server-setup.md 21節。
+      # 入れたときの実測（2026-09-06）では、1段目・2段目とも 0 件で緑だった。そのとき報告された
+      # high 7 件はすべて devDependencies 由来で、--omit=dev で 0 件になった（今の件数は npm audit で見る）。
+      # 背景は docs/server-setup.md 21節。
       - run: npm audit --omit=dev --audit-level=high
 
       - run: npm audit --audit-level=critical
@@ -69,9 +70,7 @@ jobs:
 
       # php artisan testはnpm run buildの後に置く：resources/views/app.blade.phpの@vite()が
       # public/build/manifest.jsonを要求するため、ビルド前に実行すると全ページが
-      # 「Vite manifest not found」で確実に失敗することを実測で確認した
-      # （依頼上は pint --test の後・composer audit の前が指定されていたが、
-      #   ビルド成果物が無いと物理的に実行不可能なためこの位置に変更）。
+      # 「Vite manifest not found」で確実に失敗することを実測で確認した。
       - run: php artisan test
 
       - run: npx tsx scripts/validate-content.ts

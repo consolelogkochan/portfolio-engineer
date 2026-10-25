@@ -16,7 +16,7 @@
     @vite('resources/js/app.tsx')
 
     {{-- サーバーサイドで出力するメタ情報（7-2）。$pageMeta は各Controller/bootstrap/app.phpが
-         withViewDataで渡す配列（title/description/ogImage/ogType/ogUrl）で、
+         withViewDataで渡す配列（title/description/ogImage/ogType/ogUrl/canonical）で、
          値の解決（デフォルトへのフォールバック等）はすべて app/Services/PageMetaBuilder.php 側で
          完了させ、ここでは受け取った値をそのまま出力するだけにする。
          <title>のみReact側（PageMeta.tsx）もdata-inertia付きで出力するが、Inertiaがdata-inertia無しの

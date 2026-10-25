@@ -68,8 +68,8 @@ class PageMetaBuilder
 
     /**
      * サイト名サフィックス付きの完成形タイトルを組み立てる。
-     * セパレータ（半角スペース＋emダッシュ＋半角スペース）は、旧TS側 lib/siteMeta.ts の
-     * pageTitle() 実装をそのまま踏襲したもの。
+     * セパレータ（半角スペース＋emダッシュ＋半角スペース）は titleSuffix() が持つ。
+     * タイトルを TS 側で組み立てていたころ（7-2 で PHP 側に移した）の形をそのまま踏襲したもの。
      */
     private function fullTitle(?string $title): string
     {

@@ -5,18 +5,14 @@ declare(strict_types=1);
 namespace App\Mail;
 
 use App\Services\UntrustedMarkdownRenderer;
-use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Address;
 use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
-use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\HtmlString;
 
 class ContactMail extends Mailable
 {
-    use Queueable, SerializesModels;
-
     public function __construct(
         public readonly string $userName,
         public readonly string $userEmail,
