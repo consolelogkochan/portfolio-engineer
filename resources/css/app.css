@@ -167,8 +167,9 @@
     margin: 1rem 0;
   }
 
-  /* タブレット以上（mdブレークポイントと統一）：見出し・本文をやや大きく */
-  @media (min-width: 768px) {
+  /* タブレット以上：見出し・本文をやや大きく。md の区切りは Tailwind の --breakpoint-md から引く
+     （@variant md。クラスの md: と同じ条件になる。7-8c） */
+  @variant md {
     .case-study h2 {
       font-size: 1.25rem;
       margin-top: 2rem;
