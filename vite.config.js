@@ -4,22 +4,22 @@ import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 
 export default defineConfig({
-    plugins: [
-        laravel({
-            input: ['resources/css/app.css', 'resources/js/app.tsx'],
-            refresh: true,
-        }),
-        tailwindcss(),
-        react(),
-    ],
-    server: {
-        watch: {
-            ignored: ['**/storage/framework/views/**'],
-        },
+  plugins: [
+    laravel({
+      input: ['resources/css/app.css', 'resources/js/app.tsx'],
+      refresh: true,
+    }),
+    tailwindcss(),
+    react(),
+  ],
+  server: {
+    watch: {
+      ignored: ['**/storage/framework/views/**'],
     },
-    resolve: {
-        alias: {
-            '@': '/resources/js',
-        },
+  },
+  resolve: {
+    alias: {
+      '@': '/resources/js',
     },
+  },
 });
