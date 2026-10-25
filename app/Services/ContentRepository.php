@@ -31,6 +31,9 @@ class ContentRepository
         'draft' => false,
     ];
 
+    /** 作品が公開されている状態の status の値。TS 側は types/work.ts の WorkSchema の z.enum にある */
+    private const string STATUS_PUBLISHED = '公開中';
+
     public function __construct(private readonly ContentParser $parser) {}
 
     /**
@@ -78,6 +81,39 @@ class ContentRepository
     }
 
     /**
+     * 作品が公開中か（status が 公開中）。
+     *
+     * @param  array<string, mixed>  $frontmatter
+     */
+    private function isPublishedWork(array $frontmatter): bool
+    {
+        return ($frontmatter['status'] ?? '') === self::STATUS_PUBLISHED;
+    }
+
+    /**
+     * ログが公開か（draft !== true）。LOG_DEFAULTS を埋めた後の frontmatter を受け取る。
+     *
+     * @param  array<string, mixed>  $frontmatter
+     */
+    private function isPublicLog(array $frontmatter): bool
+    {
+        return $frontmatter['draft'] !== true;
+    }
+
+    /**
+     * publishedAt の降順（新しい順）に並べる。
+     *
+     * @param  array<int, array<string, mixed>>  $items
+     * @return array<int, array<string, mixed>>
+     */
+    private function sortByPublishedAtDesc(array $items): array
+    {
+        usort($items, fn (array $a, array $b) => strcmp($b['publishedAt'] ?? '', $a['publishedAt'] ?? ''));
+
+        return $items;
+    }
+
+    /**
      * 公開中の作品を publishedAt の降順（新しい順）で返す。
      *
      * @return array<int, array<string, mixed>>
@@ -86,14 +122,9 @@ class ContentRepository
     {
         $works = $this->scanAll(base_path('content/works'), self::WORK_DEFAULTS);
 
-        $published = array_values(
-            array_filter($works, fn (array $w) => ($w['status'] ?? '') === '公開中'),
+        return $this->sortByPublishedAtDesc(
+            array_values(array_filter($works, $this->isPublishedWork(...))),
         );
-
-        usort($published, fn (array $a, array $b) => strcmp($b['publishedAt'] ?? '', $a['publishedAt'] ?? ''),
-        );
-
-        return $published;
     }
 
     /**
@@ -123,14 +154,9 @@ class ContentRepository
     {
         $logs = $this->scanAll(base_path('content/logs'), self::LOG_DEFAULTS);
 
-        $published = array_values(
-            array_filter($logs, fn (array $l) => $l['draft'] !== true),
+        return $this->sortByPublishedAtDesc(
+            array_values(array_filter($logs, $this->isPublicLog(...))),
         );
-
-        usort($published, fn (array $a, array $b) => strcmp($b['publishedAt'] ?? '', $a['publishedAt'] ?? ''),
-        );
-
-        return $published;
     }
 
     /**
@@ -165,7 +191,7 @@ class ContentRepository
         $result = $this->parser->parse(base_path("content/works/{$slug}.md"));
         $result['frontmatter'] = $this->withDefaults($result['frontmatter'], self::WORK_DEFAULTS);
 
-        if (($result['frontmatter']['status'] ?? '') !== '公開中') {
+        if (! $this->isPublishedWork($result['frontmatter'])) {
             throw new ContentNotPublishedException("Unpublished work is not public: {$slug}");
         }
 
@@ -187,7 +213,7 @@ class ContentRepository
         $result = $this->parser->parse(base_path("content/logs/{$slug}.md"));
         $result['frontmatter'] = $this->withDefaults($result['frontmatter'], self::LOG_DEFAULTS);
 
-        if ($result['frontmatter']['draft'] === true) {
+        if (! $this->isPublicLog($result['frontmatter'])) {
             throw new ContentNotPublishedException("Draft log is not public: {$slug}");
         }
 
@@ -201,18 +227,9 @@ class ContentRepository
      */
     public function hasPublishedWork(string $slug): bool
     {
-        $path = base_path("content/works/{$slug}.md");
-        if (! file_exists($path)) {
-            return false;
-        }
-
-        try {
-            $result = $this->parser->parse($path);
-        } catch (ContentNotFoundException|ContentParseException) {
-            return false;
-        }
-
-        return ($result['frontmatter']['status'] ?? '') === '公開中';
+        return $this->existsAndIsPublic(
+            base_path("content/works/{$slug}.md"), self::WORK_DEFAULTS, $this->isPublishedWork(...),
+        );
     }
 
     /**
@@ -222,7 +239,20 @@ class ContentRepository
      */
     public function hasPublishedLog(string $slug): bool
     {
-        $path = base_path("content/logs/{$slug}.md");
+        return $this->existsAndIsPublic(
+            base_path("content/logs/{$slug}.md"), self::LOG_DEFAULTS, $this->isPublicLog(...),
+        );
+    }
+
+    /**
+     * hasPublishedWork・hasPublishedLog の共通の形。ファイルが無い・パースに失敗したときは false。
+     * 公開の判定は、既定値を埋めた後の frontmatter で行う（getWork・getLog と同じ）。
+     *
+     * @param  array<string, mixed>  $defaults
+     * @param  callable(array<string, mixed>): bool  $isPublic
+     */
+    private function existsAndIsPublic(string $path, array $defaults, callable $isPublic): bool
+    {
         if (! file_exists($path)) {
             return false;
         }
@@ -233,6 +263,6 @@ class ContentRepository
             return false;
         }
 
-        return $this->withDefaults($result['frontmatter'], self::LOG_DEFAULTS)['draft'] !== true;
+        return $isPublic($this->withDefaults($result['frontmatter'], $defaults));
     }
 }

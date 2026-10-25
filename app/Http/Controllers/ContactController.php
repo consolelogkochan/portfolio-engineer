@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Enums\SpamReason;
 use App\Http\Requests\ContactRequest;
 use App\Mail\ContactMail;
 use App\Services\PageMetaBuilder;
@@ -17,6 +18,12 @@ use Symfony\Component\Mailer\Exception\TransportExceptionInterface;
 
 class ContactController extends Controller
 {
+    /**
+     * 成功の文言。本当に送ったときと、ボットを静かに弾いたとき（ハニーポット・時間トラップ）の
+     * 2か所で使う。ボットに違いを見せないため、2か所は同じでなければならない。
+     */
+    private const string SUCCESS_MESSAGE = 'お問い合わせを受け付けました。折り返しご連絡いたします。';
+
     public function __construct(private readonly PageMetaBuilder $pageMeta) {}
 
     public function create(): Response
@@ -40,20 +47,18 @@ class ContactController extends Controller
         if ($spamReason !== null) {
             // 誤検知把握のためログに残す。入力内容は記録しない。
             Log::warning('Contact spam detected', [
-                'reason' => $spamReason,
+                'reason' => $spamReason->value,
                 'ip' => $request->ip(),
                 'user_agent' => $request->userAgent(),
             ]);
 
-            // ボットの特徴（ハニーポット・時間トラップ）は静かに弾く：
-            // ボットにはメールが送られたように見せ、実際には送らない。
-            if (in_array($spamReason, ['honeypot', 'too_fast'], true)) {
-                return redirect()->back()->with('success', 'お問い合わせを受け付けました。折り返しご連絡いたします。');
+            // 静かに弾くか、エラーを返すかの分け方は SpamReason::isSilent()
+            if ($spamReason->isSilent()) {
+                return redirect()->back()->with('success', self::SUCCESS_MESSAGE);
             }
 
-            // 人間が現実に掛かりうる層（URL数・トークン破損）は、本人が気づいて
-            // 送り直せるようにエラーを返す。メールは送らない。
-            $message = $spamReason === 'too_many_urls'
+            // エラーを返す層。メールは送らない。
+            $message = $spamReason === SpamReason::TooManyUrls
                 ? '本文に含まれるリンクが多すぎます。リンクの数を減らして、もう一度お試しください。'
                 : '送信内容を確認できませんでした。お手数ですが、ページを再読み込みしてから、もう一度お試しください。';
 
@@ -82,6 +87,6 @@ class ContactController extends Controller
             ]);
         }
 
-        return redirect()->back()->with('success', 'お問い合わせを受け付けました。折り返しご連絡いたします。');
+        return redirect()->back()->with('success', self::SUCCESS_MESSAGE);
     }
 }

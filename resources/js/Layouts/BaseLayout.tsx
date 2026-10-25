@@ -1,3 +1,4 @@
+import { NAV_LINKS } from '@/navigation';
 import { Link, usePage } from '@inertiajs/react';
 import React from 'react';
 
@@ -20,15 +21,11 @@ export default function BaseLayout({ children }: Props) {
           {siteName}
         </Link>
         <nav className="flex gap-4 md:gap-6 text-sm">
-          <Link href="/works" className="text-text-muted hover:text-primary">
-            Works
-          </Link>
-          <Link href="/about" className="text-text-muted hover:text-primary">
-            About
-          </Link>
-          <Link href="/contact" className="text-text-muted hover:text-primary">
-            Contact
-          </Link>
+          {NAV_LINKS.map(({ href, label }) => (
+            <Link key={href} href={href} className="text-text-muted hover:text-primary">
+              {label}
+            </Link>
+          ))}
         </nav>
       </header>
 

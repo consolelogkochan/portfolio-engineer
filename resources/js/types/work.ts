@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { isoDate } from './common';
 
 const MetricSchema = z.object({
   label: z.string(),
@@ -25,7 +26,7 @@ export const WorkSchema = z.object({
   status: z.enum(['公開中', '非公開']),
   featured: z.boolean().default(false),
   summary: z.string(),
-  publishedAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'YYYY-MM-DD形式で記述'),
+  publishedAt: isoDate,
   period: z.object({
     start: z.string(),
     // 省略時はWorks/Showで「継続中」として表示される運用（進行中の案件はendを書かない）。

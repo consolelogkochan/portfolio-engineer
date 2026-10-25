@@ -97,8 +97,11 @@ class PageMetaBuilder
         return ' — '.$this->siteName();
     }
 
-    /** 相対パスをconfig('app.url')基点の絶対URLにする。既に絶対URL（http(s)://〜）ならそのまま返す */
-    private function absoluteUrl(string $path): string
+    /**
+     * 相対パスをconfig('app.url')基点の絶対URLにする。既に絶対URL（http(s)://〜）ならそのまま返す。
+     * サイトマップと robots.txt も、サイトの絶対URLをここで作るために公開する（7-8c）。
+     */
+    public function absoluteUrl(string $path): string
     {
         if (str_starts_with($path, 'http://') || str_starts_with($path, 'https://')) {
             return $path;

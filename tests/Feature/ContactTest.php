@@ -26,10 +26,10 @@ use Tests\TestCase;
 // 実測 2026-09-26）。
 class ContactTest extends TestCase
 {
-    /** 経過秒数の判定を確実に通過させるため、config('spam.min_seconds')より十分前の時刻にする */
+    /** 経過秒数の判定を通過させるため、config('spam.min_seconds')より前の時刻にする */
     private function validFormToken(): string
     {
-        return Crypt::encryptString((string) (time() - 10));
+        return Crypt::encryptString((string) (time() - config('spam.min_seconds') - 1));
     }
 
     /** @return array<string, mixed> */
@@ -87,13 +87,14 @@ class ContactTest extends TestCase
         $response->assertSessionHas('success');
     }
 
-    /** 本文にURLが3つ（既定の上限2を超える）あると、メールを送らずエラーを返す */
+    /** 本文のURLが上限（config('spam.max_urls')）より1つ多いと、メールを送らずエラーを返す */
     public function test_too_many_urls_does_not_send_mail_and_returns_error(): void
     {
         Mail::fake();
 
+        $urls = array_map(fn (int $i) => "http://{$i}.example.com", range(0, config('spam.max_urls')));
         $response = $this->post('/contact', $this->validPayload([
-            'message' => 'http://a.example.com http://b.example.com http://c.example.com',
+            'message' => implode(' ', $urls),
         ]));
 
         Mail::assertNothingSent();

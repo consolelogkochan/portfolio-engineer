@@ -4,6 +4,7 @@
 import FeaturedShowcase from '@/Components/FeaturedShowcase';
 import PageMeta from '@/Components/PageMeta';
 import { buttonClasses } from '@/Components/ui/Button';
+import { NAV_LINKS } from '@/navigation';
 import { WorkSummary } from '@/types/work';
 import { Link } from '@inertiajs/react';
 
@@ -53,14 +54,14 @@ export default function Home({ featuredWorks, pageTitle }: Props) {
           すべての作品を見る
         </Link>
 
-        {/* lg以上でナビが小さく感じたため、gapと文字サイズを軽く一段引き上げる（過剰な拡大はしない） */}
+        {/* lg以上でナビが小さく感じたため、gapと文字サイズを軽く一段引き上げる（過剰な拡大はしない）。
+            Works は上のボタンが担うので、ナビのページのうち Works 以外を並べる */}
         <div className="flex justify-center gap-6 lg:gap-8 mt-6 text-sm lg:text-base">
-          <Link href="/about" className="text-text-muted hover:text-primary">
-            About
-          </Link>
-          <Link href="/contact" className="text-text-muted hover:text-primary">
-            Contact
-          </Link>
+          {NAV_LINKS.filter(({ href }) => href !== '/works').map(({ href, label }) => (
+            <Link key={href} href={href} className="text-text-muted hover:text-primary">
+              {label}
+            </Link>
+          ))}
         </div>
       </section>
     </div>

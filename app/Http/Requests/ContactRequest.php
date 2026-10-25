@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Requests;
 
+use App\Enums\SpamReason;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Crypt;
 use Throwable;
@@ -44,34 +45,34 @@ class ContactRequest extends FormRequest
 
     /**
      * 中身ベースのスパム判定（3層）。
-     * スパムなら理由文字列、正常なら null を返す。
+     * スパムなら理由、正常なら null を返す。
      * ユーザーにはエラーを見せず、コントローラが静かに弾く。
      *
-     * @return string|null スパム理由、または null（正常）
+     * @return SpamReason|null スパム理由、または null（正常）
      */
-    public function detectSpam(): ?string
+    public function detectSpam(): ?SpamReason
     {
         // 第1層：ハニーポット（人間には見えない囮フィールドが埋まっていたらボット）
         if ($this->filled('website')) {
-            return 'honeypot';
+            return SpamReason::Honeypot;
         }
 
         // 第2層：時間トラップ（フォーム表示から送信までが短すぎたらボット）
         $token = $this->input('form_token', '');
         try {
             $issuedAt = (int) Crypt::decryptString($token);
-            if ((time() - $issuedAt) < config('spam.min_seconds', 3)) {
-                return 'too_fast';
+            if ((time() - $issuedAt) < config('spam.min_seconds')) {
+                return SpamReason::TooFast;
             }
         } catch (Throwable) {
             // 復号失敗＝トークン改ざん or 欠落
-            return 'invalid_token';
+            return SpamReason::InvalidToken;
         }
 
         // 第3層：URL 数（スパムリンクの大量投稿を弾く）
         $urlCount = preg_match_all('/https?:\/\/\S+/i', $this->input('message', ''));
-        if ($urlCount > config('spam.max_urls', 2)) {
-            return 'too_many_urls';
+        if ($urlCount > config('spam.max_urls')) {
+            return SpamReason::TooManyUrls;
         }
 
         return null;

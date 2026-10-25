@@ -27,8 +27,8 @@ class OptimizeImages extends Command
 
     public function handle(ImageService $service): int
     {
-        $maxWidth = (int) config('image.max_width', 1200);
-        $quality = (int) config('image.webp_quality', 80);
+        $maxWidth = (int) config('image.max_width');
+        $quality = (int) config('image.webp_quality');
         $force = (bool) $this->option('force');
 
         $success = 0;

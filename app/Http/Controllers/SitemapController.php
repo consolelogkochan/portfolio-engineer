@@ -5,30 +5,32 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Services\ContentRepository;
+use App\Services\PageMetaBuilder;
 use Illuminate\Http\Response;
 
 class SitemapController extends Controller
 {
-    public function __construct(private readonly ContentRepository $repository) {}
+    public function __construct(
+        private readonly ContentRepository $repository,
+        private readonly PageMetaBuilder $pageMeta,
+    ) {}
 
     public function index(): Response
     {
-        $baseUrl = rtrim((string) config('app.url'), '/');
-
-        $urls = [
-            $baseUrl.'/',
-            $baseUrl.'/works',
-            $baseUrl.'/about',
-            $baseUrl.'/contact',
-        ];
+        $urls = array_map($this->pageMeta->absoluteUrl(...), [
+            '/',
+            '/works',
+            '/about',
+            '/contact',
+        ]);
 
         foreach ($this->repository->listPublishedWorks() as $work) {
-            $urls[] = $baseUrl.'/works/'.$work['slug'];
+            $urls[] = $this->pageMeta->absoluteUrl('/works/'.$work['slug']);
         }
 
         // draft=trueは除外済み（ContentRepository::listPublishedLogs）
         foreach ($this->repository->listPublishedLogs() as $log) {
-            $urls[] = $baseUrl.'/logs/'.$log['slug'];
+            $urls[] = $this->pageMeta->absoluteUrl('/logs/'.$log['slug']);
         }
 
         return response($this->toXml($urls))
