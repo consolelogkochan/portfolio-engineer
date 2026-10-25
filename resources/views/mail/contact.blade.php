@@ -6,7 +6,7 @@
 
 ---
 
-{{ $userMessage }}
+<x-mail::visitor-message :html="$userMessageHtml" :text="$userMessage" />
 
 ---
 

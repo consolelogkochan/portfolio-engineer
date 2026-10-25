@@ -4,12 +4,14 @@ declare(strict_types=1);
 
 namespace App\Mail;
 
+use App\Services\UntrustedMarkdownRenderer;
 use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Address;
 use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\HtmlString;
 
 class ContactMail extends Mailable
 {
@@ -44,8 +46,26 @@ class ContactMail extends Mailable
                 'userName' => $this->userName,
                 'userEmail' => $this->userEmail,
                 'userMessage' => $this->userMessage,
+                'userMessageHtml' => new HtmlString($this->userMessageHtml()),
             ],
         );
+    }
+
+    /**
+     * 訪問者の本文を、リンク・画像・生の HTML を落とした HTML にする（UntrustedMarkdownRenderer）。
+     *
+     * Markdown のメールは、テンプレートを展開した全体をもう一度 Markdown として変換する
+     * （Laravel のメールのレイアウトの Markdown::parse）。本文をそのまま置くと、訪問者の書いた
+     * Markdown がそこで解釈される。変換済みの HTML を置いても、HTML のかたまりは空行で終わり、
+     * その後ろは Markdown として読まれる（コードブロックの中の空行など）。
+     * そのため改行を文字参照（&#10;）にして1行にし、全体を1つの HTML のかたまりにする。
+     * 文字参照の改行は、<pre> の中では改行として、そのほかでは空白として表示される。
+     */
+    private function userMessageHtml(): string
+    {
+        $html = app(UntrustedMarkdownRenderer::class)->toHtml($this->userMessage);
+
+        return str_replace(["\r\n", "\r", "\n"], '&#10;', $html);
     }
 
     public function attachments(): array
