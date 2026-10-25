@@ -73,6 +73,28 @@ class ContactTest extends TestCase
         $response->assertSessionDoesntHaveErrors();
     }
 
+    /**
+     * フォームの表示から config('spam.min_seconds') 秒たたずに送られたら、ボットとして静かに捨てる
+     * （メール送信なし、応答は成功）。ハニーポットと見分けるため、ログの理由も確かめる
+     */
+    public function test_too_fast_submission_does_not_send_mail(): void
+    {
+        Mail::fake();
+        Log::spy();
+
+        $response = $this->post('/contact', $this->validPayload([
+            'form_token' => Crypt::encryptString((string) time()),
+        ]));
+
+        Mail::assertNothingSent();
+        $response->assertSessionHas('success');
+        $response->assertSessionDoesntHaveErrors();
+        Log::shouldHaveReceived('warning')
+            ->once()
+            ->withArgs(fn (string $message, array $context) => $message === 'Contact spam detected'
+                && $context['reason'] === 'too_fast');
+    }
+
     /** websiteキー自体を送らない場合も、既定値''により正常に送信される */
     public function test_website_key_omitted_sends_mail(): void
     {

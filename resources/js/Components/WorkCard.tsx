@@ -20,7 +20,7 @@ export default function WorkCard({ work }: Props) {
     // （5-17で見送っていた「折り返して見切れる」懸念はこれで解消）。
     <article className="relative overflow-hidden rounded-lg border border-border hover:border-primary transition-colors h-96">
       {work.featured && (
-        <span className="absolute top-3 right-3 bg-linear-to-br from-primary-hover via-primary-light to-primary text-background text-xs font-mono px-2 py-0.5 rounded-sm z-10 shadow-[inset_0_1px_1px_rgba(255,255,255,0.25)]">
+        <span className="absolute top-3 right-3 bg-linear-to-br from-primary-hover via-primary-light to-primary text-background text-xs font-mono px-2 py-0.5 rounded-sm z-10 shadow-[inset_0_1px_1px_color-mix(in_oklab,var(--color-highlight)_25%,transparent)]">
           ★ 注目
         </span>
       )}

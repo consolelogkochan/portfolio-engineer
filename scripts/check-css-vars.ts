@@ -1,5 +1,6 @@
 import { join, relative } from 'path';
 import { existsSync, readFileSync, readdirSync } from 'fs';
+import { fileURLToPath } from 'url';
 
 // CSS の未定義の変数（カスタムプロパティ）を見つける（7-8b-5）。
 // var(--名前) の名前を間違えても、ビルド・lint・型の検査・テストのどれも止めず、ブラウザでは指定が無視される。
@@ -8,7 +9,8 @@ import { existsSync, readFileSync, readdirSync } from 'fs';
 // 代わりの値を書いた var(--名前, …) は、定義が無くても代わりの値が使われるので対象にしない。
 // Tailwind のクラス名の書き間違いは見つけない。
 
-const ROOT = new URL('..', import.meta.url).pathname;
+// fileURLToPath：.pathname だと、パスの空白や日本語が %20 などのまま残る
+const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const BUILD_ASSETS = join(ROOT, 'public/build/assets');
 const SOURCE_DIR = join(ROOT, 'resources/js');
 

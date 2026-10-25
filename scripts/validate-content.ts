@@ -1,11 +1,13 @@
 import { join } from 'path';
 import { existsSync, readFileSync, readdirSync } from 'fs';
+import { fileURLToPath } from 'url';
 import matter from 'gray-matter';
 import { z } from 'zod';
 import { WorkSchema } from '@/types/work';
 import { LogSchema } from '@/types/log';
 
-const ROOT = new URL('..', import.meta.url).pathname;
+// fileURLToPath：.pathname だと、パスの空白や日本語が %20 などのまま残る
+const ROOT = fileURLToPath(new URL('..', import.meta.url));
 
 function collectMdFiles(dir: string): string[] {
   if (!existsSync(dir)) return [];

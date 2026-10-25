@@ -3,45 +3,19 @@
 // featuredの絞り込みはサーバー（ContentRepository::listFeaturedWorks）が担う。
 // このコンポーネントは渡された配列をそのまま表示するだけで、featuredかどうかは判定しない。
 //
-// embla-carousel-react のセットアップ（useSyncExternalStoreでの状態同期等）はGallery(5-10)と
-// 同じ考え方を流用している。中身（1枚の画像 vs 1件の作品カード）が別物なので今は別々に実装したが、
-// emblaセットアップ部分の重複は共通化の芽としてここに記録しておく（5-14時点では着手しない）。
+// embla-carousel-react の配線（状態の同期・キーボード操作）は、Gallery と共通の useCarousel にある。
+// 中身（1枚の画像 vs 1件の作品カード）は別物なので、見た目はそれぞれで組む。
 //
 // 0件：null（Home側でセクションごと非表示）。1件：カルーセルUI無しで単体を大きく表示。
 // 複数件：前後ボタン・ドット・カウンター付きのemblaカルーセル（Galleryと同様の操作UI）。
+import { useCarousel } from '@/hooks/useCarousel';
 import { WorkSummary } from '@/types/work';
 import { Link } from '@inertiajs/react';
-import useEmblaCarousel, { type UseEmblaCarouselType } from 'embla-carousel-react';
-import { KeyboardEvent, useCallback, useSyncExternalStore } from 'react';
 
 type Props = { works: WorkSummary[] };
 
-function subscribe(emblaApi: UseEmblaCarouselType[1]) {
-  return (callback: () => void) => {
-    if (!emblaApi) return () => {};
-    emblaApi.on('select', callback).on('reInit', callback);
-    return () => {
-      emblaApi.off('select', callback).off('reInit', callback);
-    };
-  };
-}
-
 export default function FeaturedShowcase({ works }: Props) {
-  // loop:true のため末尾→先頭、先頭→末尾へ回り込む（前後ボタンの無効化は不要）
-  const [emblaRef, emblaApi] = useEmblaCarousel({ loop: true });
-
-  const selectedIndex = useSyncExternalStore(
-    subscribe(emblaApi),
-    () => emblaApi?.selectedScrollSnap() ?? 0
-  );
-
-  const handleKeyDown = useCallback(
-    (e: KeyboardEvent) => {
-      if (e.key === 'ArrowLeft') emblaApi?.scrollPrev();
-      if (e.key === 'ArrowRight') emblaApi?.scrollNext();
-    },
-    [emblaApi]
-  );
+  const { emblaRef, emblaApi, selectedIndex, handleKeyDown } = useCarousel();
 
   if (works.length === 0) return null;
 

@@ -2,41 +2,13 @@
 // 見た目（ボタン・ドット・カウンターの配色/形）は一切持たないため、全て自前トークンで組む。
 // このコンポーネント自体の存在理由も「複数枚の画像を束ねて1つの体験として見せる」こと。
 // 0枚は非表示、1枚は画像のみ（切り替えUIは無意味なので出さない）、複数枚のみ通常のカルーセルになる。
+import { useCarousel } from '@/hooks/useCarousel';
 import { Work } from '@/types/work';
-import useEmblaCarousel, { type UseEmblaCarouselType } from 'embla-carousel-react';
-import { KeyboardEvent, useCallback, useSyncExternalStore } from 'react';
 
 type Props = { gallery: Work['gallery'] };
 
-// embla の内部状態（選択中インデックス等）は embla 自身が持つ外部ストアなので、
-// useState+useEffectで複製せず useSyncExternalStore で直接同期する。
-function subscribe(emblaApi: UseEmblaCarouselType[1]) {
-  return (callback: () => void) => {
-    if (!emblaApi) return () => {};
-    emblaApi.on('select', callback).on('reInit', callback);
-    return () => {
-      emblaApi.off('select', callback).off('reInit', callback);
-    };
-  };
-}
-
 export default function Gallery({ gallery }: Props) {
-  // loop:true のため末尾→先頭、先頭→末尾へ回り込む（常に両方向へ送れる＝前後ボタンの無効化は不要）
-  const [emblaRef, emblaApi] = useEmblaCarousel({ loop: true });
-
-  const selectedIndex = useSyncExternalStore(
-    subscribe(emblaApi),
-    () => emblaApi?.selectedScrollSnap() ?? 0
-  );
-
-  // キーボード操作（← →）：emblaコアにはキーボード制御が無いため手動で配線。スワイプ/ドラッグはembla標準機能。
-  const handleKeyDown = useCallback(
-    (e: KeyboardEvent) => {
-      if (e.key === 'ArrowLeft') emblaApi?.scrollPrev();
-      if (e.key === 'ArrowRight') emblaApi?.scrollNext();
-    },
-    [emblaApi]
-  );
+  const { emblaRef, emblaApi, selectedIndex, handleKeyDown } = useCarousel();
 
   if (gallery.length === 0) return null;
 

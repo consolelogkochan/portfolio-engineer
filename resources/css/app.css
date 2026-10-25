@@ -76,6 +76,8 @@
                                                       「本文の強調」と「コード風表示」で用途が異なるため名前を分けている（6-5で統合） */
   --color-heading:       var(--color-primary);  /* 本文の大見出し（.case-study の h2）。h3 は本文の文字色を使う（7-6b） */
   --color-error:         var(--color-red-400);  /* バリデーションエラー表示用（フォームのフィールドエラー等） */
+  --color-highlight:     var(--color-white);    /* 注目のバッジの上端の光（WorkCard）。白は Tailwind の既定の色。
+                                                   濃さ（25%）は使う側のクラスで付ける（7-8c） */
 
   /* ErrorPage（404等）のシンタックスハイライト専用（6-2）。
      サイト全体のアクセント色（primary・emphasis・error等）とは役割が異なり、
