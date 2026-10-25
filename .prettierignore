@@ -3,3 +3,16 @@ vendor
 public/build
 public/hot
 *.lock
+
+# ここから下は、Prettier の対象から外すもの（7-8c）。対象は「.」から、ここに書いたものを除いた範囲
+# （package.json の format・format:check と lint-staged が同じ範囲を見る）。
+# 文章（作品・開発ログ・手順書・台帳・README）。整形の規則ではなく、書く人が形を決める
+*.md
+# composer が4つの空白で書き直す
+composer.json
+# npm が書く
+package-lock.json
+# Sail の雛形。.editorconfig で4つの空白にしている
+compose.yaml
+# 手元の道具の設定（追跡していない）
+.claude

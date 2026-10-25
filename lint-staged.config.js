@@ -1,6 +1,9 @@
 export default {
-  // resources/js 配下の TypeScript / React ファイル
-  'resources/js/**/*.{ts,tsx}': ['eslint --fix', 'prettier --write'],
+  // TypeScript・JavaScript（resources/js・scripts・設定のファイル）と、Prettier が整形するほかのもの。
+  // どのファイルを見るかは eslint.config.js の ignores と .prettierignore が決める
+  // （npm run lint・format:check と同じ範囲。7-8c）。対象の外のファイルは、渡されても黙って飛ばす
+  '*.{js,ts,tsx}': ['eslint --fix --no-warn-ignored', 'prettier --write --ignore-unknown'],
+  '*.{json,yml,yaml,css}': ['prettier --write --ignore-unknown'],
 
   // PHPファイル（Laravel標準設定でPint整形）
   '**/*.php': ['./vendor/bin/pint'],

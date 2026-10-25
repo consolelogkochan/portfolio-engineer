@@ -14,5 +14,13 @@ trim_trailing_whitespace = false
 [*.{yml,yaml}]
 indent_size = 2
 
+# Prettier が整形するもの（.prettierrc の tabWidth と同じ。7-8c）。PHP は [*] の4のまま
+[{*.{js,ts,tsx,json,css},.prettierrc}]
+indent_size = 2
+
+# composer が4つの空白で書き直す（Prettier の対象の外。.prettierignore）
+[composer.json]
+indent_size = 4
+
 [{compose,docker-compose}.{yml,yaml}]
 indent_size = 4
