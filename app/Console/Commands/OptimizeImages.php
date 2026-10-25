@@ -14,7 +14,7 @@ class OptimizeImages extends Command
 
     protected $description = '画像を WebP に変換・最適化する（冪等）';
 
-    private const SCAN_DIRS = [
+    private const array SCAN_DIRS = [
         'public/images/works',
         'public/images/about',
         // public/images/og は意図的に対象外（5-15でaboutを足したのとは逆の判断）。
@@ -23,7 +23,7 @@ class OptimizeImages extends Command
         // プレビューが表示されないSNSが出てくるため、ここには追加しないこと。
     ];
 
-    private const EXTENSIONS = ['jpg', 'jpeg', 'png'];
+    private const array EXTENSIONS = ['jpg', 'jpeg', 'png'];
 
     public function handle(ImageService $service): int
     {

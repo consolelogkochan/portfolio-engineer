@@ -15,7 +15,7 @@ use Symfony\Component\Yaml\Yaml;
 class ContentParser
 {
     /** 最低限存在しなければならないフィールド。値の正当性検証はZodに任せる */
-    private const REQUIRED_FIELDS = ['title'];
+    private const array REQUIRED_FIELDS = ['title'];
 
     /**
      * 日付の項目。あれば YYYY-MM-DD の文字列でなければならない（並べ替えの strcmp が文字列を前提にする）。
