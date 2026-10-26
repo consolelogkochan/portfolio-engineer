@@ -84,8 +84,8 @@
 
 | 事実 | 場所 | 片方を変えたら | まとめない理由 | 同期を守るもの |
 | --- | --- | --- | --- | --- |
-| 作品と開発ログの既定値（`.default(...)`） | `types/work.ts`・`types/log.ts` と、`ContentRepository` の `WORK_DEFAULTS`・`LOG_DEFAULTS` | もう片方も同じ値にする | TS は内容の検証と型、PHP は画面に渡す値。台帳 41-7 の既定値の行 | PHP の値は `ContentDefaultsTest`。2か所の一致は**守っていない** |
-| 問い合わせのバリデーションの規則と文言 | `ContactRequest::rules()`・`messages()` と `types/contact.ts` | もう片方も直す | 言語をまたぐ。台帳 41-7 の文言の行 | **守っていない**（台帳 41-7 に再検討の条件） |
+| 作品と開発ログの既定値（`.default(...)`） | `types/work.ts`・`types/log.ts` と、`ContentRepository` の `WORK_DEFAULTS`・`LOG_DEFAULTS` | もう片方も同じ値にする | TS は内容の検証と型のため、PHP は画面に渡す値のため。既定値を JSON のファイルに置いて両方から読む案は、少ない値のために読み込みの仕組みが増え、見合わないとして採らなかった（7-8b-5）。再検討の条件：TS と PHP の値が食い違うことが起きたとき、または既定値のある項目が増えたとき | PHP の値は `ContentDefaultsTest`。2か所の一致は**守っていない** |
+| 問い合わせのバリデーションの規則と文言 | `ContactRequest::rules()`・`messages()` と `types/contact.ts` | もう片方も直す | 言語をまたぎ、一致を確かめるテストを書きにくい（7-5c-2）。再検討の条件：文言を変えるとき、または項目を増やすとき | **守っていない** |
 | 作品の公開の状態の値 | `ContentRepository::STATUS_PUBLISHED` と `types/work.ts` の `status` | もう片方も直す | 言語をまたぐ | **守っていない**（`STATUS_PUBLISHED` の説明が TS 側を指す） |
 | 日付の扱い | PHP：`ContentParser`（引用符の無い日付も受け付ける）。TS：`isoDate`（文字列だけを受け付け、引用符の無い日付は Date になって止まる） | 日付の扱いを変えるときは両方を見る | TS は門番（CI と pre-commit）、PHP は本番での備え。PHP は文字列でない日付を壊れた1件として飛ばす | **守っていない**（食い違ったまま。TS が先に止めるので、CI を通った内容では表に出ない） |
 | front matter の型（`title`・`ogImage` など） | Zod のスキーマと、PHP の型つきの引数（`PageMetaBuilder::fullTitle()`・`absoluteUrl()`） | スキーマを緩めるときは、PHP の受け取り方も見る | 型の正当性は Zod に任せる分担 | CI と pre-commit の内容の検証（Zod）。Zod を通らない内容は PHP で `TypeError` になる（7節） |
