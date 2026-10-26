@@ -132,7 +132,7 @@
 | Markdown（`content/`・`docs/`・README など）の整形 | 書く人が形を決める文章のため（`.prettierignore`） |
 | `composer.json`・`package-lock.json`・`compose.yaml` の整形 | ほかの道具が書く、または雛形のため（`.prettierignore`） |
 | `scripts/` の型の確認（`tsc -p scripts/tsconfig.json`） | CI の手順に無い。手元で動かす |
-| Blade（`resources/views/`）の整形 | Prettier も Pint も扱わない |
+| Blade（`resources/views/`）の整形 | 規則が無い。Prettier は扱わない。pre-commit は `**/*.php` に当たる Blade も Pint に渡すが、CI の `pint --test` は Blade を見ない（`pint --test` が見るファイルの数が、Blade を除いた PHP のファイルの数と同じだった） |
 | Laravel が用意した PHP の `strict_types` | 付けない（5節） |
 | テスト・型の確認・shellcheck・依存の検査 | pre-commit では動かさない。CI だけ |
 
