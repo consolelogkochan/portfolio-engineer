@@ -120,6 +120,22 @@
 
 ホスト名（`portfolio`）や設定の中身そのものは、手順書として機能させるため伏せていません。
 
+### 動かすコマンドに伏せ字を入れない（2026-10-27 に足した）
+
+これから書く手順では、動かすコマンドの中に伏せ字（`<USER>` など）を入れません。伏せ字は説明の文に置き、コマンドは変数で受けます。
+
+```bash
+user='<ここに作業用ユーザー名>'   # 説明：この行だけを、自分の値に書き換えて打つ
+curl -s -u "$user" "https://new.ikshowcase.site/"
+```
+
+- 伏せ字をそのままコマンドに残して打つと、bash は `<` を入力の切り替えの記号と読み、コマンドが動かない
+- 変数はダブルクォートで囲む（`"$user"`）。シングルクォートの中では展開されない
+
+経緯（2026-10-27）：16節の `session.upload_progress.enabled` の確かめで、ワーカーの値を見るコマンドの打ち直しが2回あった。1回目は、伏せ字の `<USER>` をそのまま打ち、`curl` が動かなかった。2回目は、シングルクォートの中の `$user` が展開されず、401 になった。どちらも一時ファイルは次の行で消え、`git status` は出力なしだった。
+
+これより前の節の手順にある伏せ字は、揃え直しません（「経緯を書き換えない」）。
+
 ---
 
 ## 1. 前提
@@ -1145,6 +1161,8 @@ EOF
 
 【写し（2026-10-24 に注記）】このブロックの `99-hardening.ini` は、本番に書いた内容の写しで、正は本番にある。突き合わせるときは、`cat /etc/php/8.5/fpm/conf.d/99-hardening.ini` の出力とこのブロックを全文で比べる。効いている値は、下の検証の方法で見る
 
+【注記（2026-10-27）】このファイルには、2026-10-27 に3行を足した。今の全文の写しは、下の「判断：`session.upload_progress.enabled` を 0 にする（2026-10-27）」にある。突き合わせは、そちらの写しで行う
+
 理由：
 
 - Webリクエストから OS コマンドを実行できないようにする。攻撃者がPHPコードを実行できる状態になっても、できることが大きく狭まる
@@ -1174,6 +1192,68 @@ EOF
 **この確認はコマンドの出力によるものであり、FPM経由で実際に1通送った結果ではない。** 実際の送信による確認は7-5cで行う。
 
 【注記（2026-10-24）】実際の送信は、その後に本番で確かめた（19節。2026-09-29）
+
+### 判断：`session.upload_progress.enabled` を 0 にする（2026-10-27）
+
+CVE-2026-115560（セッションのアップロードの進み具合を使う、リモートからのコードの実行）への備えとして、PHP-FPM で `session.upload_progress.enabled` を `0` にした（本人の判断、2026-10-27）。
+
+- PHP の公式は、2026-10-23 の告知で、次の定例のリリースまでこの値を `0` にすることを勧めた。修正版はまだ無い（出典：PHP の公式のお知らせ、2026-10-23。https://www.php.net/ ）
+- 起きる条件は3つ（`session.serialize_handler` を `php_binary`・`php_serialize` にしている／`session_start()` の前に `ini_set()` で `php` に切り替える／この機能が有効）。このサイトは、前の2つに当てはまらない（Laravel は PHP 組み込みのセッションを使わない）。それでも止めるのは、このサイトにアップロードの機能が無く、止めても失うものが無いため
+- **修正版が出た後も戻さない。** 戻しても得るものが無い
+- **再検討の条件：アップロードの機能を足すとき。** 気づく経路：その機能を作る作業の中で人が気づく
+- 置き場所は、自分の判断による設定を集めた `99-hardening.ini`（上の「判断：disable_functionsを設定する」）。fpm/conf.d に置いているので、CLI には影響しない。開発環境のコンテナには入れていない（`docs/environment.md` の「揃えない差」）。修正版を入れる手順は9節、台帳 41-6
+
+足した3行：
+
+```bash
+sudo tee -a /etc/php/8.5/fpm/conf.d/99-hardening.ini > /dev/null <<'EOF'
+
+; CVE-2026-115560 への備え（2026-10-27）。アップロードの機能が無いので止める。
+; 修正版が出た後も戻さない。再検討の条件：アップロードの機能を足すとき（16節）
+session.upload_progress.enabled = 0
+EOF
+sudo php-fpm8.5 -t
+sudo systemctl restart php8.5-fpm
+```
+
+【写し（2026-10-27）】足した後の `99-hardening.ini` の全文。本番に書いた内容の写しで、正は本番にある。突き合わせるときは、`cat /etc/php/8.5/fpm/conf.d/99-hardening.ini` の出力とこのブロックを全文で比べる。
+
+```ini
+; PHP-FPM の堅牢化
+; 自分の判断による設定はこのファイルに集約する。
+; conf.d は php.ini の後に読まれ、後の値が勝つ。
+; fpm/conf.d に置いているため、CLI（php artisan / composer）には影響しない。
+
+disable_functions = exec,passthru,shell_exec,system,proc_open,popen,pcntl_exec,dl
+
+; CVE-2026-115560 への備え（2026-10-27）。アップロードの機能が無いので止める。
+; 修正版が出た後も戻さない。再検討の条件：アップロードの機能を足すとき（16節）
+session.upload_progress.enabled = 0
+```
+
+**実測（2026-10-27、時刻は UTC）**
+
+- 変える前：`99-hardening.ini` の中身は、上の 2026-10-24 の写しと同じだった。`php-fpm8.5 -i` で `session.upload_progress.enabled => On => On`。`/etc/php/8.5/fpm/` の中に、ほかにこの値を決めている行は無かった（`grep -rnE '^\s*(php_(admin_)?(value|flag)\[)?session\.upload_progress' /etc/php/8.5/fpm/` の出力なし）
+- 足した後：`php-fpm8.5 -t` は `test is successful`。`php-fpm8.5 -i` で `session.upload_progress.enabled => Off => Off`
+- 再起動：`systemctl restart php8.5-fpm` の後、`active`。`ActiveEnterTimestamp=Tue 2026-10-27 07:33:18 UTC`
+- 動いているワーカーの値：`'0'`。一時的な PHP ファイルを `public/` に置いて `ini_get()` を返させ、すぐに消した。消した後は `404`、`git status` は出力なしだった
+- ブラウザで、トップ・作品詳細・About の表示と、問い合わせの送信とメールの受信を確かめた
+- その日の Laravel のログのファイルは無かった（その日にまだ記録が無い）
+
+**ワーカーの値の確かめ方**（付録D の「PHP（実行中のプロセス）」。一時的なファイルは、作成・実行・削除を一続きで行う）：`php-fpm8.5 -i` が見せるのは、新しく起動するプロセスが読む設定である。動いているワーカーが同じ値を使っているかは、ワーカーに `ini_get()` を返させて見る。`user=` の行だけを自分の値に書き換えて打つ（上の「この文書の約束」の、動かすコマンドに伏せ字を入れない）。
+
+```bash
+user='<ここに作業用ユーザー名>'
+cd /var/www/portfolio/public \
+  && f="check-$(openssl rand -hex 8).php" \
+  && printf '%s\n' '<?php var_export(ini_get("session.upload_progress.enabled"));' > "$f" \
+  && curl -s -u "$user" "https://new.ikshowcase.site/$f"; echo
+rm -f "/var/www/portfolio/public/$f"
+curl -s -o /dev/null -w '%{http_code}\n' -u "$user" "https://new.ikshowcase.site/$f"
+git -C /var/www/portfolio status --short
+```
+
+期待：1つめの `curl` が `'0'`、2つめが `404`、`git status` は出力なし。`curl -u` はパスワードを対話で尋ね、画面には出さない。
 
 ### 判断：php-fpm の umask を 0007 にする
 

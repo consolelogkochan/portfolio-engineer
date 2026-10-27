@@ -89,6 +89,7 @@
 | 作品の公開の状態の値 | `ContentRepository::STATUS_PUBLISHED` と `types/work.ts` の `status` | もう片方も直す | 言語をまたぐ | **守っていない**（`STATUS_PUBLISHED` の説明が TS 側を指す） |
 | 日付の扱い | PHP：`ContentParser`（引用符の無い日付も受け付ける）。TS：`isoDate`（文字列だけを受け付け、引用符の無い日付は Date になって止まる） | 日付の扱いを変えるときは両方を見る | TS は門番（CI と pre-commit）、PHP は本番での備え。PHP は文字列でない日付を壊れた1件として飛ばす | **守っていない**（食い違ったまま。TS が先に止めるので、CI を通った内容では表に出ない） |
 | front matter の型（`title`・`ogImage` など） | Zod のスキーマと、PHP の型つきの引数（`PageMetaBuilder::fullTitle()`・`absoluteUrl()`） | スキーマを緩めるときは、PHP の受け取り方も見る | 型の正当性は Zod に任せる分担 | CI と pre-commit の内容の検証（Zod）。Zod を通らない内容は PHP で `TypeError` になる（7節） |
+| CI の Node の版の決まり方（`setup-node` の設定） | `.github/workflows/ci.yml` と `deploy.yml` の `actions/setup-node`（`node-version-file: package.json`・`check-latest: true`） | もう片方も同じにする | 検査と、本番に載るビルドが、別のワークフローに分かれている（21節）。版の範囲そのものは `package.json` の `engines` の1か所 | **守っていない**（2つのファイルのコメントが、両方に置くことを書いている。2026-10-27） |
 | og:image を png・jpg にすること | `types/work.ts` の `ogImage` の正規表現と、`OptimizeImages::SCAN_DIRS` から `public/images/og` を外していること | もう片方も直す | 型の検証と、画像の変換の対象は別の道具 | `PageMetaTest` が、og:image が png か jpg であることと、ファイルがあることを確かめる |
 | トップの h1 の文面 | `resources/js/Pages/Home.tsx` の h1 と、`config/page_meta.php` の `home` の `description` | もう片方も直す | 表示の文面と meta の説明は届き先が違う | **守っていない**（両方のコメントが互いを指す。台帳 41-12 の写しの行） |
 | 固定のページのパス | `routes/web.php` と、`SitemapController::index()`・`ci.yml` の表示の確認・`FaviconTest` | ページを足したら、サイトマップに足すかを決める | 目的が違う（サイトマップは全部を載せる。CI とテストは、壊れたら困るものだけを引く） | サイトマップは**守っていない**。CI とテストは、無くなったパスで落ちる |
