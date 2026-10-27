@@ -4078,6 +4078,7 @@ PNGが圧縮されないことの確認になる。対象に入れていない�
 - 月次の`apt update && apt upgrade`のときに、証明書の残り日数もあわせて確認する（`sudo certbot certificates`）。ログイン時の警告と二重にしているのは、新しい習慣を作らず、既にある動作に乗せるためである
 - 月次の`apt update && apt upgrade`のときに、ESM で入る修正もあわせて確認する（`pro security-status --esm-apps`）。esm-apps の対象のパッケージと、修正の有無と中身を確かめ、32節の露出に照らして判断する。ログイン時の表示には、ESM で入る修正の件数の行が出ていなかった（2026-10-21）ため、表示ではなくこのコマンドで見る
 - 月次の`apt update && apt upgrade`のときに、開発環境の PHP と Composer の版が本番と同じかもあわせて確認する。開発のイメージは作った時点で固まるため、本番の PHP が自動更新で上がるとずれる。開発機で `./vendor/bin/sail build --no-cache` → `./vendor/bin/sail up -d` を行い、コンテナの `php -v` と `composer --version` を、本番の `php -v` と `composer --version` と比べる。作り直しで揃うはずなので、作り直した後も違うなら原因を調べる
+- 月次の`apt update && apt upgrade`のときに、修正版が効いているかもあわせて確認する（2026-10-27 に足した）。`apt-cache policy php8.5-fpm nginx composer libbrotli1` で入っている版（Installed）を見て、`systemctl show -p ActiveEnterTimestamp php8.5-fpm nginx` で PHP-FPM と nginx の起動時刻を見る。**パッケージが上がっても、サービスは再起動するまで古いまま動く**（9節）。起動時刻がパッケージの更新（`/var/log/dpkg.log` の時刻）より前なら、9節の「Critical の告知に気づいたときの手順」で再起動する。nginx と `libbrotli1` は、2026年10月の脆弱性（nginx の CVE-2026-15176、Brotli の展開の CVE-2026-111497）で、Ubuntu が 26.04 を「評価待ち」としていた（出典：Ubuntu の CVE のページ。2026-10-26 に確かめた）。直れば自動のセキュリティ更新で入るが、効いたかは起動時刻で確かめる。`composer` は、Ubuntu が CVE-2026-40261・40176 を直した版を出すのを待っている（台帳 41-7）。本番に `libbrotli1` が入っているかは確かめていない。入っていなければ、Installed は `(none)` と出る
 - **ログの最新のファイルは`laravel.log`ではない。** 2026-09-27に日ごとに分ける方式へ変えたため、**最新は`laravel-<日付>.log`である。**
 
   ```
