@@ -4158,7 +4158,34 @@ PNGが圧縮されないことの確認になる。対象に入れていない�
 - 月次の`apt update && apt upgrade`のときに、証明書の残り日数もあわせて確認する（`sudo certbot certificates`）。ログイン時の警告と二重にしているのは、新しい習慣を作らず、既にある動作に乗せるためである
 - 月次の`apt update && apt upgrade`のときに、ESM で入る修正もあわせて確認する（`pro security-status --esm-apps`）。esm-apps の対象のパッケージと、修正の有無と中身を確かめ、32節の露出に照らして判断する。ログイン時の表示には、ESM で入る修正の件数の行が出ていなかった（2026-10-21）ため、表示ではなくこのコマンドで見る
 - 月次の`apt update && apt upgrade`のときに、開発環境の PHP と Composer の版が本番と同じかもあわせて確認する。開発のイメージは作った時点で固まるため、本番の PHP が自動更新で上がるとずれる。開発機で `./vendor/bin/sail build --no-cache` → `./vendor/bin/sail up -d` を行い、コンテナの `php -v` と `composer --version` を、本番の `php -v` と `composer --version` と比べる。作り直しで揃うはずなので、作り直した後も違うなら原因を調べる
-- 月次の`apt update && apt upgrade`のときに、修正版が効いているかもあわせて確認する（2026-10-27 に足した）。`apt-cache policy php8.5-fpm nginx composer libbrotli1` で入っている版（Installed）を見て、`systemctl show -p ActiveEnterTimestamp php8.5-fpm nginx` で PHP-FPM と nginx の起動時刻を見る。**パッケージが上がっても、サービスは再起動するまで古いまま動く**（9節）。起動時刻がパッケージの更新（`/var/log/dpkg.log` の時刻）より前なら、9節の「Critical の告知に気づいたときの手順」で再起動する。nginx と `libbrotli1` は、2026年10月の脆弱性（nginx の CVE-2026-15176、Brotli の展開の CVE-2026-111497）で、Ubuntu が 26.04 を「評価待ち」としていた（出典：Ubuntu の CVE のページ。2026-10-26 に確かめた）。直れば自動のセキュリティ更新で入るが、効いたかは起動時刻で確かめる。`composer` は、Ubuntu が CVE-2026-40261・40176 を直した版を出すのを待っている（台帳 41-7）。本番に `libbrotli1` が入っているかは確かめていない。入っていなければ、Installed は `(none)` と出る
+- 月次の`apt update && apt upgrade`のときに、修正版が効いているかもあわせて確認する（2026-10-27 に足した）。`apt-cache policy php8.5-fpm nginx composer libbrotli1` で入っている版（Installed）を見て、`systemctl show -p ActiveEnterTimestamp php8.5-fpm nginx` で PHP-FPM と nginx の起動時刻を見る。**パッケージが上がっても、サービスは再起動するまで古いまま動く**（9節）。起動時刻がパッケージの更新（`/var/log/dpkg.log` の時刻）より前なら、9節の「Critical の告知に気づいたときの手順」で再起動する。nginx と `libbrotli1` は、2026年10月の脆弱性（nginx の CVE-2026-15176、Brotli の展開の CVE-2026-111497）で、Ubuntu が 26.04 を「評価待ち」としていた（出典：Ubuntu の CVE のページ。2026-10-26 に確かめた）。直れば自動のセキュリティ更新で入るが、効いたかは起動時刻で確かめる。`composer` は、Ubuntu が CVE-2026-40261・40176 を直した版を出すのを待っている（台帳 41-7）。【2026-10-27】直ったかは、版の番号（2.9.6 以上か）では見ない。Ubuntu は版の番号を上げずに修正だけを取り込むことがある（PHP は 8.5.4 のまま `8.5.4-0ubuntu1.5` で直った。9節）。下の「修正版が来たかを CVE の番号で見る」の方法で見る。本番に `libbrotli1` が入っているかは確かめていない。入っていなければ、Installed は `(none)` と出る
+- 月次の`apt upgrade`の前に、`sudo apt upgrade --dry-run` で、何が入れ替わるかを見る（2026-10-27 に足した）。grub・PHP（`php8.5-*`）・nginx・composer が含まれるかを見て、末尾の `Summary:` の行が `Removing: 0` であること（消されるパッケージが無いこと）を確かめる。grub が含まれていれば、上の grub の項目のとおり、作業者が見ている時間帯に再起動する。`Removing` が 0 でなければ、何が消えるかを読んでから進める。実測（2026-10-27、使い捨ての `ubuntu:26.04` のコンテナ）：apt 3.2 の `--dry-run` は、`Summary:` の下に `Upgrading: 4, Installing: 0, Removing: 0, Not Upgrading: 0` の形で出した
+- 上の `apt-cache policy` では、`Installed` と `Candidate` が同じかも見る（2026-10-27 に足した）。違えば、取れる版がまだ入っていない（自動の更新がまだか、自動では入らない通常の更新）。セキュリティの修正版なら、9節の「Critical の告知に気づいたときの手順」で入れる
+- **修正版が来たかを CVE の番号で見る**（2026-10-27 に足した）。版の番号では分からないことがあるため、パッケージの changelog に CVE の番号があるかで見る。今、待っているのは PHP の CVE-2026-115560（台帳 41-6）と、Composer の CVE-2026-40261・40176（台帳 41-7）
+
+  入っている版に、修正が入ったかを見る（入れた後の確かめ。ネットワークは要らない）：
+
+  ```bash
+  zcat /usr/share/doc/php8.5-fpm/changelog.Debian.gz | grep -n 'CVE-2026-115560'
+  zcat /usr/share/doc/composer/changelog.Debian.gz | grep -nE 'CVE-2026-40261|CVE-2026-40176'
+  ```
+
+  取れる版（`Candidate`）に、修正が入っているかを見る（入れる前の確かめ。changelogs.ubuntu.com への接続が要る）：
+
+  ```bash
+  v=$(apt-cache policy php8.5-fpm | awk '/Candidate:/{print $2}')
+  apt changelog "php8.5-fpm=$v" | grep -n 'CVE-2026-115560'
+  v=$(apt-cache policy composer | awk '/Candidate:/{print $2}')
+  apt changelog "composer=$v" | grep -nE 'CVE-2026-40261|CVE-2026-40176'
+  ```
+
+  どちらも、行が出れば修正が入っている。何も出なければ入っていない（`grep` は何も出さずに終わる）。
+
+  実測（2026-10-27、開発環境のコンテナ）：入っている `php8.5-cli` の `8.5.4-0ubuntu1.5` の `changelog.Debian.gz` には、PHP2Shell の CVE-2026-109618 の行があり、CVE-2026-115560 の行は無かった（`grep` は何も出さなかった）。本番に `/usr/share/doc/php8.5-fpm/changelog.Debian.gz` があるかは確かめていない。無ければ、同じソースの `php8.5-cli` のファイルで見る
+
+  **`apt changelog` が使えない場合がある。** 実測（2026-10-27、使い捨ての `ubuntu:26.04` のコンテナ）：`composer` の `2.9.5-1` の changelog は取れ、CVE-2026-40261・40176 の行は無かった。`php8.5` の `8.5.4-0ubuntu1.5`（セキュリティの修正版）は `Changelog unavailable … (404  Not Found)` になり、取れなかった。セキュリティの修正版の changelog が、置かれてすぐには changelogs.ubuntu.com に無いことがあると読んでいる（推測）。`ca-certificates` が無い環境では https の取得に失敗した。本番から `apt changelog` を使えるかは、確かめていない。取れないときは、Ubuntu の CVE のページで 26.04（resolute）の状態を見る（https://ubuntu.com/security/CVE-2026-115560 、https://ubuntu.com/security/CVE-2026-40261 、https://ubuntu.com/security/CVE-2026-40176 ）。「Fixed」と版が書かれていれば、その版を入れる
+
+  出典：`apt changelog` は「既定で、入っている版の changelog を出す。install と同じ指定（`パッケージ=版` など）ができる」（Ubuntu の man ページ apt-get(8)。https://manpages.ubuntu.com/manpages/resolute/en/man8/apt-get.8.html ）。そのため、取れる版を見るときは `=版` で指定する。入っている版と取れる版が違うときに、指定しないと入っている版の changelog が出ることは、確かめていない（同じ版のパッケージでしか試していない）
 - **ログの最新のファイルは`laravel.log`ではない。** 2026-09-27に日ごとに分ける方式へ変えたため、**最新は`laravel-<日付>.log`である。**
 
   ```
