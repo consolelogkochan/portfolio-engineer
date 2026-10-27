@@ -25,9 +25,12 @@ jobs:
       # ゲートの基準が版で揺れてしまうため対象にしない（30節）。
       - run: shellcheck --severity=warning bin/*.sh
 
+      # check-latest：実行機に置いてある古い版を使わず、engines の範囲の最新を取りに行く
+      # （2026-10-27。直近の CI は 24.21.0 で動いていた。開発環境は 24.22.1）。ci.yml と deploy.yml の両方に置く。
       - uses: actions/setup-node@v7
         with:
           node-version-file: package.json
+          check-latest: true
           cache: npm
 
       - uses: shivammathur/setup-php@v2
