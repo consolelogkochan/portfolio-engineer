@@ -34,7 +34,7 @@ gallery:
   - src: "/images/works/portfolio-engineer/gallery/works-v3.webp"
     alt: "Works一覧。portfolio-engineerと、3件のサンプルの作品のカードを並べて表示"
     caption: "Works一覧（サンプルデータでの表示）"
-  - src: "/images/works/portfolio-engineer/gallery/work-detail-v4.webp"
+  - src: "/images/works/portfolio-engineer/gallery/work-detail-v5.webp"
     alt: "作品詳細ページ。作品名、ギャラリー（開発ログの画面を表示中）、その下に数値・概要とケーススタディの冒頭を表示"
     caption: "作品詳細：ギャラリーと、概要・ケーススタディ"
   - src: "/images/works/portfolio-engineer/gallery/log-detail-v2.webp"
@@ -46,8 +46,9 @@ gallery:
   - src: "/images/works/portfolio-engineer/gallery/contact-v2.webp"
     alt: "お問い合わせページ。名前・メールアドレス・件名・内容の入力フォーム（入力前）を表示"
     caption: "Contact：問い合わせフォーム"
-# metrics は実態の写し。CIの検査の項目（.github/workflows/ci.yml）・テストの件数（php artisan test）・
-# 手順書の節（docs/server-setup.md）を変えたら直す。作品詳細の gallery の画像にも写っている（7-7b）
+# metrics は実態の写し。CIの検査の項目（.github/workflows/ci.yml）・テストの件数（php artisan test）を
+# 変えたら直す。本番運用は始めた月（2026年8月。docs/server-setup.md の35節・36節の日付）で、変わらない。
+# 作品詳細の gallery の画像にも写っている（7-7b）
 metrics:
   - label: "CIの自動検査"
     value: "14"
@@ -55,9 +56,9 @@ metrics:
   - label: "テスト"
     value: "54"
     unit: "件"
-  - label: "手順書"
-    value: "41"
-    unit: "節"
+  - label: "本番運用"
+    value: "2026.8"
+    unit: "〜"
 ---
 
 ## 背景
