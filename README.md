@@ -2,7 +2,11 @@
 
 Kotaro Izaki のポートフォリオサイトのソースコードです。このサイト自体が、設計から本番の運用までを記録しながら作った作品の1つです。
 
+サイト：https://new.ikshowcase.site
+
 [![CI](https://github.com/consolelogkochan/portfolio-engineer/actions/workflows/ci.yml/badge.svg)](https://github.com/consolelogkochan/portfolio-engineer/actions/workflows/ci.yml)
+
+![サイトのトップページ（2026-10-29 に撮影）](docs/images/readme-top.webp)
 
 ## このプロジェクトについて
 
@@ -45,7 +49,8 @@ docs/
   ledger.md       # 持ち越しの台帳（後で扱う項目、解決した項目、扱わないと決めた記録）
   environment.md  # 環境の一覧（開発・CI・本番のツールと版、その意図の索引）
   development.md  # 開発者向けの構成と様式の一覧（事実の正の置き場所、同期が要る箇所、様式の規則と守る道具）
-bin/              # デプロイと巻き戻しのスクリプト
+  images/         # この README の画像
+bin/              # デプロイと巻き戻し、デプロイの後の応答確認のスクリプト
 .github/workflows/ # CI とデプロイ
 ```
 
