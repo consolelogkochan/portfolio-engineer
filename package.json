@@ -40,7 +40,6 @@
   },
   "dependencies": {
     "@fontsource/jetbrains-mono": "^5.2.8",
-    "@fontsource/noto-sans-jp": "^5.2.9",
     "@inertiajs/react": "^3.4.0",
     "embla-carousel-react": "^8.6.0",
     "react": "^19.2.7",
