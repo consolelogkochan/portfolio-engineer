@@ -9,6 +9,9 @@ createInertiaApp({
   // サーバー側（PHP: app/Services/PageMetaBuilder.php）で組み立て済みのものを
   // pageTitle propとして受け取り、各ページがPageMeta（<Head title>）にそのまま渡す（7-2）。
   // 省略時、Inertia coreはtitleをそのまま使う（titleCallback未指定時のデフォルト＝恒等関数）。
+  // ページはすべて最初にまとめて読む（eager）。7-9d でページごとに分けて読む形を試し、取り消した。
+  // 人の理由：ページを移るときの待ちが増え、実際の端末で気になった。最初の表示の差
+  // （手元の模擬で約0.3秒）より、移るときの使い心地を優先する。経緯は docs/development.md の9節。
   resolve: (name) => {
     const pages = import.meta.glob<{ default: ResolvedComponent }>('./Pages/**/*.tsx', {
       eager: true,
