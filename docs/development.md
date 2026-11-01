@@ -200,6 +200,7 @@
 **SSR**
 
 - 使わない。最初に採らないと決めたのは 7-2（`docs/environment.md` の Inertia の行が理由の場所を指す）。7-9d でも採らないと決めた。人の理由：「本番でNode.jsのプロセスを常に動かしておく必要があり、サーバーで管理するものと、本番で動く外部のコードが増える」
+- `config/inertia.php` の既定は `env('INERTIA_SSR_ENABLED', true)` で有効だが、SSR のバンドルが無いので SSR は動かず、SSR のサーバーにもつなぎに行かない（`inertiajs/inertia-laravel` v3.5.1 の `Ssr/HttpGateway.php` と `Ssr/BundleDetector.php` を読んだ。2026-11-01）。本番の `.env` の値は確かめていない。有効でも無効でも害が無く、判断が変わらないため
 
 **測った値**
 
