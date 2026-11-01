@@ -40,7 +40,7 @@
 | `bootstrap/app.php` | ルートとミドルウェアの登録、例外の応答（送信の上限を超えたときの応答、エラーのページ） | — |
 | `routes/web.php` | URL とコントローラの対応。robots.txt（クロージャ） | — |
 | `config/page_meta.php`・`config/spam.php`・`config/image.php` | 自前の設定（サイト名とページのメタ情報、スパムの判定、画像の変換） | ほかの `config/` のファイルは Laravel が用意したもの |
-| `resources/js/Pages/` | Inertia のページ（ページ名とファイルの対応は `resources/js/app.tsx` の `resolve`） | — |
+| `resources/js/Pages/` | Inertia のページ（ページ名とファイルの対応は `resources/js/app.tsx` の `resolve`。すべてのページを最初にまとめて読む。9節） | — |
 | `resources/js/Components/` | 画面の部品。`ui/` は見た目だけの汎用の部品（`Button`・`Card`・`Tag`） | — |
 | `resources/js/Layouts/BaseLayout.tsx` | ヘッダー・ナビ・フッター（`app.tsx` がすべてのページに付ける） | — |
 | `resources/js/hooks/useCarousel.ts` | 画像の切り替え（embla）の動きの配線：状態の同期とキーボード | カウンター・ボタン・ドット・中身の描き方と位置（`Gallery.tsx`・`FeaturedShowcase.tsx` がそれぞれ持つ） |
@@ -52,7 +52,8 @@
 | `public/images/` | 画像。`og/` は og:image 用で、`images:optimize` の対象の外 | — |
 | `scripts/` | 内容の検証（`validate-content.ts`）と、CSS の未定義の変数の検査（`check-css-vars.ts`） | — |
 | `tests/Feature/` | テスト（すべて Feature。Unit のテストスイートは `phpunit.xml` に無い。Unit のテストを書くときに戻す） | — |
-| `bin/` | デプロイと巻き戻しのスクリプト（サーバーで動く。手順は `docs/server-setup.md`） | — |
+| `bin/` | デプロイと巻き戻しのスクリプト（`deploy.sh`・`rollback.sh`。サーバーで動く。手順は `docs/server-setup.md`）と、デプロイの後の応答確認のスクリプト（`check-site.sh`。`deploy.yml` の `verify` が GitHub Actions で動かす。手元からも動かせる） | — |
+| `docs/images/` | README の画像（`readme-top.webp`。中身は gallery の `top-v3.webp` と同じ） | サイトが配る画像（`public/images/`。名前の規則は手順書40節）。README の画像は gallery を直接参照しない（gallery の差し替えで黙って切れるため） |
 | `.github/workflows/` | CI（`ci.yml`）とデプロイ（`deploy.yml`） | — |
 | `database/` | Laravel が用意したもの。このアプリは DB を使わない | — |
 
@@ -178,3 +179,40 @@
 | `app/Models/User.php` | `config/auth.php` の `providers.users.model`。アプリのコードからは使っていない。消すと、認証の仕組みを使ったときに、無いクラスを読みにいくと見込んでいる（確かめていない） |
 | `app/Providers/AppServiceProvider.php` | `bootstrap/providers.php` に登録されている。中身は空 |
 | `HandleInertiaRequests::version()` | Inertia のミドルウェアの雛形にあり、親の `version()` を呼ぶだけ。消しても親の同じ処理が使われる（読んだだけ）。資産の版を変える場所が目に見えるように残す |
+
+## 9. 表示の速さに関わる判断
+
+7-9d（2026-11-01）で決めたもの。サーバーが付けるキャッシュの期限は Nginx の設定の話なので、手順書39節に置く。
+
+**フォント**
+
+- 本文（`--font-sans`）は端末のフォントで描く。並びと理由は `resources/css/app.css` の `--font-sans` とその上のコメント。等幅（`--font-mono`）は JetBrains Mono のまま（`@fontsource/jetbrains-mono`。届くのは latin の 400・700 の2つで、各約22KB。2026-11-01 の測定の通信の一覧）
+- 7-9d までは Noto Sans JP を自前で配っていた。日本語の2つで約2MB あった。`font-display: swap` で preload は無く、実際のブラウザでは最初の描画を止めていなかった。替えて得たのは、通信の量、遅い回線での文字の切り替わりが無くなること、Lighthouse の点数
+- 人の理由：このプロジェクトの目的や姿勢に立ち返り、フォントのこだわりよりも機能的な使いやすさやスマートさを優先した
+- 見た目は端末ごとに変わる。Windows と Android での見た目は確かめていない
+- `@fontsource/noto-sans-jp` は外した（`4766071`）
+
+**ページの読み込み方**
+
+- すべてのページを最初にまとめて読む（`resources/js/app.tsx` の `resolve`。`import.meta.glob` の `eager: true`）。そのため、問い合わせのページの検証が使う `zod` も、最初に読む束に入っている
+- ページごとに分けて読む形を試し（`1be6e73`）、取り消した（`30ae59f`）。人の理由：ページを移るときの待ちが増え、実際の端末で気になった。最初の表示の差（手元の模擬で約0.3秒）より、移るときの使い心地を優先する
+
+**SSR**
+
+- 使わない。最初に採らないと決めたのは 7-2（`docs/environment.md` の Inertia の行が理由の場所を指す）。7-9d でも採らないと決めた。人の理由：「本番でNode.jsのプロセスを常に動かしておく必要があり、サーバーで管理するものと、本番で動く外部のコードが増える」
+
+**測った値**
+
+条件：Lighthouse 13.5.0、モバイル（既定）、`simulate`（往復150ms・下り約1.6Mbps・CPU を4倍遅くする仮定）、Performance だけ。1つのページにつき3回。結果のファイルはリポジトリに入れていない。
+
+| いつ・どこ | トップの点数 | トップの FCP | 作品詳細の点数 | 作品詳細の FCP |
+| --- | --- | --- | --- | --- |
+| 本番、直す前（2026-11-01 07:24 UTC） | 55・55・55 | 12.0〜12.2秒 | 55・60・60 | 6.9〜12.0秒 |
+| 手元、直す前（2026-11-01） | 55・55・55 | 14.3秒 | 66・56・66 | 3.8〜9.0秒 |
+| 手元、フォントを替えた後 | 81・81・81 | 3.6秒 | 77・77・77 | 3.6秒 |
+| 手元、フォントとページごとの読み込みの後 | 83・83・83 | 3.2〜3.3秒 | 79・80・79 | 3.3秒 |
+| 本番、フォントとページごとの読み込みの後（2026-11-01、手元の時計で 08:26 UTC） | 96・99・99 | 1.65〜1.73秒 | 97・98・97 | 1.64〜1.66秒 |
+| 本番、ページごとの読み込みを取り消した後 | 測っていない | — | — | — |
+
+- 読み方：模擬の値は上の仮定のもとでの計算で、実際の利用者の待ち時間ではない（直す前の本番で、模擬を掛けない観測の FCP は約1.5〜2.6秒）。比べるのは、同じ条件の前と後だけ。手元は gzip が無く、本番とは値が違う
+- 取り消した後の本番は測っていない。手元の模擬の差が約0.3秒なので、大きくは変わらないと見込んでいる（推測）
