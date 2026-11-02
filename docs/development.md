@@ -33,6 +33,7 @@
 | `app/Http/Controllers/` | ページごとに、Repository と Builder を呼んで props と `pageMeta` を渡す。サイトマップ（`SitemapController`） | Markdown のファイルを直接読むこと（`ContentRepository` を経由する。`ContentRepository::getAbout` の説明） |
 | `app/Http/Requests/ContactRequest.php` | 問い合わせのバリデーションと、スパムの判定（`detectSpam`） | 判定の後の応答（静かに弾くか、エラーを返すかは `ContactController`。分け方は `SpamReason::isSilent`） |
 | `app/Http/Middleware/HandleInertiaRequests.php` | すべてのページに共有する props（flash の文言、サイト名） | — |
+| `app/Http/Middleware/ContentSecurityPolicy.php` | `Content-Security-Policy` のヘッダ（10節）。全体のミドルウェアとして `bootstrap/app.php` で登録する | 通信の方針のヘッダ（HSTS など。Nginx が付ける。10節） |
 | `app/Mail/` | 問い合わせのメール | — |
 | `app/Enums/` | スパムの判定の理由（`SpamReason`） | — |
 | `app/Exceptions/` | コンテンツの例外（無い・読めない、壊れている、非公開） | — |
@@ -217,3 +218,34 @@
 
 - 読み方：模擬の値は上の仮定のもとでの計算で、実際の利用者の待ち時間ではない（直す前の本番で、模擬を掛けない観測の FCP は約1.5〜2.6秒）。比べるのは、同じ条件の前と後だけ。手元は gzip が無く、本番とは値が違う
 - 取り消した後の本番は測っていない。手元の模擬の差が約0.3秒なので、大きくは変わらないと見込んでいる（推測）
+
+## 10. 応答ヘッダの判断
+
+7-9e（2026-11-02）で決めたもの。
+
+**役割の分担**
+
+- 名前ごとの通信の方針と、どの応答にも付けるヘッダは、Nginx が付ける。`Strict-Transport-Security`・`X-Content-Type-Options`・`Referrer-Policy`・`X-Frame-Options` の4つ。設定の写しは手順書36節、判断は39節
+- ページが何を読み込むかの方針（`Content-Security-Policy`）は、アプリが付ける。ページに何を載せるかを決めるのはアプリで、同じ場所で読めて、CI のテストで確かめられるため（人）
+- 方針は、それを変える理由が生まれる場所の近くに置く
+
+**CSP**
+
+- 場所：`App\Http\Middleware\ContentSecurityPolicy`。値は同じファイルの `POLICY`
+- 登録：全体のミドルウェア（`bootstrap/app.php` の `$middleware->append`）。`web` のグループに入れると、ルートに一致しない 404 の応答を通らない（テストで確かめた）。HTML 以外の応答にも付くが、害は無い
+- 中身
+  - 自分のサイト（`'self'`）だけを許す
+  - スタイルだけ、インライン（`'unsafe-inline'`）を許す。Inertia が実行時に差し込む `<style>`（進捗の表示）のため
+  - `object-src 'none'`・`base-uri 'self'`・`form-action 'self'`・`frame-ancestors 'none'`
+- `default-src` にまとめ、`script-src`・`img-src` などは個別に書かない。並べると、新しい種類の書き漏らしが起きうるため。`default-src` で代わりにならない3つ（`base-uri`・`form-action`・`frame-ancestors`）は書く
+- JavaScript から要素の `style` のプロパティに代入すること（embla・Inertia）は、`style-src` では止まらない（MDN の `style-src`。2026-11-02 に読んだ）
+- 開発のとき（`Vite::isRunningHot()`、`public/hot` がある）は付けない。開発サーバーのスクリプトと WebSocket、`@viteReactRefresh` のインラインのスクリプトが止まるため
+- 入れ方：Report-Only を使わず、手元の本番と同じ形のビルドで、ページの移動・gallery・空の送信・404 の違反が0件であることを確かめてから、止める形で入れた（人）
+- zod：`resources/js/types/contact.ts` の `z.config({ jitless: true })`。zod が起動のときに行う `new Function` の試しが、CSP の違反としてコンソールに毎回出るのを止める。CSP の下では試しが失敗して同じ検証の道を使うので、動きは変わらない。コンソールにいつもエラーが出ると、人の確かめで本当のエラーと区別できなくなるため（人）。`'unsafe-eval'` を許す案は、守りを弱めるので取らない（人）
+- テスト：`tests/Feature/ContentSecurityPolicyTest.php` の5件。トップ・作品詳細・問い合わせ・404 で値が全文一致すること、開発サーバーが動いているときに付かないこと。期待の値は定数を参照せず、文字列で書いている。実際のブラウザで違反を拾う仕組みは無い（台帳 41-15）
+- 再検討の条件：訪問者が書いたものを表示するようになったとき
+
+**同じことを2か所で言っているもの**
+
+- 他のサイトの枠の中に表示させないことは、Nginx の `X-Frame-Options: DENY` と、CSP の `frame-ancestors 'none'` の両方で言っている。両方に対応するブラウザでは `frame-ancestors` が優先される（推測。仕様は読んでいない）。`frame-ancestors` を読まない古いブラウザのために `X-Frame-Options` を残す（人の判断。理由の向きは、古いブラウザは `X-Frame-Options` だけを読むという読み。確かめていない）
+- 片方を変えるときは、もう片方も見る

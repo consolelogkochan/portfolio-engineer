@@ -3214,6 +3214,7 @@ server {
     add_header X-Content-Type-Options "nosniff" always;
     add_header Referrer-Policy "strict-origin-when-cross-origin" always;
     add_header X-Frame-Options "DENY" always;
+    add_header Strict-Transport-Security "max-age=31536000" always;
 
 
     # ビルド成果物は、ファイル名が内容から算出されている。
@@ -3227,6 +3228,7 @@ server {
         add_header X-Content-Type-Options "nosniff" always;
         add_header Referrer-Policy "strict-origin-when-cross-origin" always;
         add_header X-Frame-Options "DENY" always;
+        add_header Strict-Transport-Security "max-age=31536000" always;
     }
 
     # 画像は名前にハッシュが無いため、期限を7日にとどめ、immutable は付けない（39節）。
@@ -3249,7 +3251,7 @@ server {
         expires -1;
         try_files $uri $uri/ /index.php?$query_string;
     }
-
+    
     # 静的ファイルが実在すればそれを返し、なければ index.php に渡す
     location / {
         try_files $uri $uri/ /index.php?$query_string;
@@ -3276,6 +3278,14 @@ server {
     auth_basic_user_file /etc/nginx/.htpasswd;
 
 消した後、本番の全文（人が `sudo cat` で出したもの）とこのブロックを `diff` で全文比べ、差分は0件だった（2026-10-31。空白だけの行も含めて一致した）。**突き合わせた日：2026-10-31。** ブロックの中の「このサイトは 401 を多く返すので、付けないと大半の応答に乗らない」は、本番のコメントの写しなので残す。撤去の後は 401 を多く返すことは無いが、`always` を付ける理由（成功以外の応答にもヘッダを乗せる）は変わらない
+
+【注記（2026-11-02）】7-9e で、人が本番の `server` と `/build/` の `add_header X-Frame-Options "DENY" always;` の直後に、`add_header Strict-Transport-Security "max-age=31536000" always;` を1行ずつ足した。このブロックにも同じ2行を足した。判断は39節の【追記（2026-11-02）】。
+
+あわせて、このブロックの `location = /apple-touch-icon.png { … }` の後の行を、空の行から**空白4つだけの行**に直した（本番と同じ。人の判断、2026-11-02）。Markdown を編集すると行末の空白が消えやすいので、ここに書いておく。消えると、下の `sha256sum` が一致しなくなる。
+
+**突き合わせた日：2026-11-02。** 人が `sudo cat` で出した全文と `diff` で比べ、差分は0件だった。さらに、人が本番で出した `sudo sha256sum /etc/nginx/sites-available/portfolio` の値と、このブロックから取り出したファイルの値が一致した（どちらも `ae001ef557e2f7d1c613db134a468d0f1fb313e905077efa5fc5381c47ed82e2`）。
+
+【注記（2026-11-02）】上の 2026-10-31 の「空白だけの行も含めて一致した」は、誤りだった見込みである。HSTS を入れる前の本番の控えは 5,301 バイトで、10-31 に貼られた全文から作った写しは 5,297 バイトだった。差の4バイトは、上の空白4つだけの行と合う。10-31 の写しは、貼り付けで行末の空白が落ちた形で、その写しとの一致だったと読む（大きさの差からの推測）。2026-10-13 の実測（このブロックの上）は、この行を空白だけの行と書いていた
 
 ```bash
 sudo nginx -t
@@ -3312,6 +3322,20 @@ sudo cat -n /etc/nginx/sites-available/portfolio
 実測（2026-10-13）：7-7d で設定を変える前に、語で絞る `grep` で突き合わせ、食い違いは無いと判断した。変えた後に全文で比べたところ、指令2つ（`fastcgi_read_timeout 60s;` と、画像とアイコンの location）と、多数のコメント・並びが食い違っていた。指令の食い違いは、2026-09-27 に本番に足した `fastcgi_read_timeout 60s;` を、このブロックに足していなかったものである。コメントの食い違いは、7-3d-4 以降に生じたと読める（本番のコメントは、手順書と git の履歴に無い）。
 
 本番の設定が正で、このブロックは写しである。写しは手で合わせるしかない（41-12）。
+
+【追記（2026-11-02）】全文の比較に加えて、指紋（`sha256sum`）でも比べる。貼り付けを通らないので、行末の空白が落ちない。本番で次を出す。
+
+```bash
+sudo sha256sum /etc/nginx/sites-available/portfolio
+```
+
+リポジトリの側では、このブロックの中身だけを取り出して、同じ指紋を出す（macOS は `shasum -a 256`、Linux は `sha256sum`）。
+
+```bash
+awk '/^`\/etc\/nginx\/sites-available\/portfolio`を次の内容に置き換える。$/{f=1;next} f&&/^```nginx$/{g=1;next} g&&/^```$/{exit} g' docs/server-setup.md | shasum -a 256
+```
+
+2つの値が同じなら、全文が一致している。違えば、どこが違うかは指紋では分からないので、全文の `diff` で探す。実測（2026-11-02）：このコマンドで、本番と同じ値が出た（上の【注記（2026-11-02）】）
 
 **`location ~ \.php$`のブロックに`fastcgi_read_timeout 60s;`を明示している**（2026-09-27に追加）。**値はNginxの既定値と同じであり、変えるために書いたのではない。** 上の設定のブロックへの反映は、2026-10-13（7-7d）に行った。
 
@@ -4102,6 +4126,17 @@ Permissions-Policyが守る相手は、自分のコードではなく、注入�
 
 判断を「7-9でCSPと一緒に判断する」から「入れない」に変更する。入れない理由と、理由が二度誤った経緯は 41-7 に記載する。判断（入れない）自体は初回から変わっていない。
 
+【追記（2026-11-02）】7-9e で、上の表で入れなかった HSTS と CSP を入れた。上の表と訂正は、決めた当時の経緯として残す。
+
+- **HSTS を入れる**（人の承認）。値は `max-age=31536000`（1年）で、`includeSubDomains` と `preload` は付けない。Nginx の `server` と `/build/` に `always` で書いた（判断5 のため `/build/` にも書く。`/images/` とアイコンは `expires` だけなので書かない）。設定の写しは36節
+  - 理由（人）：再訪した人の、暗号化されていない最初の1回が無くなる（問い合わせのフォームがある）。証明書が切れたときの違いは「警告を越える手段が無くなる」ことで、どちらにしても直すのは証明書（警告を越えてまで見に来ることは想定しない）。本当に困るのは `new.ikshowcase.site` で HTTPS をやめるとき（名前を手放すなど）だが、7-9b で `new.` が公開の名前になり、見込みは低い
+  - 段階的に延ばす形は取らない。確かめるべき読み込みがすべて HTTPS で、期日の付いた作業が増えるため。`includeSubDomains` は、下の名前が無く得るものが無い（台帳 41-9）。`preload` は、ドメインの元から `includeSubDomains` 付きで送る必要があり、ロリポップの名前にも効くので使えない
+  - 出典：HSTS があると、証明書の誤りのときにブラウザは警告を越えて進む手段を出さない。取り消すには `max-age=0` を HTTPS で届ける必要がある（MDN の `Strict-Transport-Security`。https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Strict-Transport-Security 。2026-11-02 に読んだ）
+  - 実測（2026-11-02、人）：トップ・`/build/` の JS・`/images/` の画像・404 に、`strict-transport-security: max-age=31536000` と今の3つが付いた
+  - **再検討の条件：`new.ikshowcase.site` で HTTPS をやめるとき、または公開の名前を変えるとき**
+- **CSP はアプリのミドルウェアに置く**（人の承認）。ページが何を読み込むかを決めるのはアプリで、同じ場所で読めて、CI のテストで確かめられるため。通信の方針（HSTS）は Nginx に置く。中身・入れ方・zod の設定・テスト・再検討の条件は `docs/development.md` の10節
+- `Permissions-Policy` は「入れない」のまま（台帳 41-7）
+
 ### 判断5：add_headerの継承（実測）
 
 実測：locationに`add_header`を1つでも書くと、serverブロックの`add_header`は継承されない。
@@ -4127,6 +4162,8 @@ Permissions-Policyが守る相手は、自分のコードではなく、注入�
 - 実測（2026-10-13）：`expires` だけを書いた3つの location（`/images/`・`/favicon.ico`・`/apple-touch-icon.png`）の応答と、存在しない画像の404に、セキュリティのヘッダ3つが返った
 
 したがって、画像とアイコンのキャッシュの指示は `add_header` ではなく `expires` で付けた（36節）。`/build/` の4行の書き直しは変えていない。`expires` では `public` と `immutable` を付けられないため（出典：同じ文書の `expires` の項。付くのは `max-age` か `no-cache`）。
+
+【注記（2026-11-02）】7-9e で HSTS を足し、`/build/` の書き直しは5行（`Cache-Control` と4つのヘッダ）になった（36節）。`/images/` とアイコンは `expires` だけなので、HSTS は `server` から継承される（実測 2026-11-02、人：`/images/` の画像に HSTS が付いた）
 
 ### 判断6：robots.txtの圧縮で増える件は、対処しない
 
