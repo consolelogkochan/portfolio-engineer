@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Http\Middleware\ContentSecurityPolicy;
 use App\Http\Middleware\HandleInertiaRequests;
 use App\Services\PageMetaBuilder;
 use Illuminate\Foundation\Application;
@@ -19,6 +20,9 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        // 全体に付ける。ルートに一致しない 404 にも付けるため（7-9e）
+        $middleware->append(ContentSecurityPolicy::class);
+
         $middleware->web(append: [
             HandleInertiaRequests::class,
         ]);
