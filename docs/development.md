@@ -15,7 +15,7 @@
 - 構成や様式を変えるコミットでは、この文書も同じコミットで直す
 - 今の状態の一覧なので、コードの中身や値は写さず、場所（ファイル・シンボルの名前）と規則を指す。規則の中身（例：字下げの幅）を書くときも、正の設定のファイルを指す
 - 現在形で書くのは、確かめた事実だけ
-- ほかの文書との分担：ツールと版は [`docs/environment.md`](environment.md)、持ち越しと受け入れの再検討の条件は [`docs/ledger.md`](ledger.md)、サーバーの設定とその判断の経緯は [`docs/server-setup.md`](server-setup.md)。この文書は、それらを写さずに指す
+- ほかの文書との分担：ツールと版は [`docs/environment.md`](environment.md)、持ち越しと受け入れの再検討の条件は [`docs/ledger.md`](ledger.md)、サーバーの設定とその判断の経緯は [`docs/server-setup.md`](server-setup.md)、公開の後の運用の一覧は [`docs/operations.md`](operations.md)。この文書は、それらを写さずに指す
 
 ## 1. 全体の流れ
 
@@ -100,6 +100,7 @@
 | 別名 `@`（`resources/js`） | `vite.config.js`・`tsconfig.json`・`scripts/tsconfig.json` | 3か所とも直す | 道具ごとに設定の置き場所が決まっている | `vite.config.js` は CI のビルド、`tsconfig.json` は CI の `tsc`。`scripts/tsconfig.json` は CI で型の確認をしていない（6節） |
 | 本物のコンテンツの slug（`portfolio-engineer`）に頼るテスト | `WorkVisibilityTest`・`PageMetaTest`・`FaviconTest`・`ContentDefaultsTest` | slug を変えたらテストも直す | コンテンツの置き場所を差し替える仕組みが無い（`WorkVisibilityTest` の説明。`BrokenFrontMatterTest` だけは、アプリの基点のパスを一時ディレクトリに替えている） | テスト（slug が変われば落ちる） |
 | キャッシュを作って確かめる手順 | `bin/deploy.sh` と `bin/rollback.sh` | もう片方も直す | それぞれをサーバーで単独で読めることを優先する | **守っていない**（CI の shellcheck は書き方だけを見る） |
+| 公開の後の運用 | 正は手順書（`docs/server-setup.md`）と台帳（`docs/ledger.md`）。一覧は `docs/operations.md` | `docs/operations.md` も直す | 一目で網羅を点検するための索引で、正の記録の置き場所とは目的が違う | **守っていない**（人が直す） |
 
 ## 5. 様式の規則
 
@@ -249,3 +250,28 @@
 
 - 他のサイトの枠の中に表示させないことは、Nginx の `X-Frame-Options: DENY` と、CSP の `frame-ancestors 'none'` の両方で言っている。両方に対応するブラウザでは `frame-ancestors` が優先される（推測。仕様は読んでいない）。`frame-ancestors` を読まない古いブラウザのために `X-Frame-Options` を残す（人の判断。理由の向きは、古いブラウザは `X-Frame-Options` だけを読むという読み。確かめていない）
 - 片方を変えるときは、もう片方も見る
+
+## 11. 問い合わせの失敗のときの振る舞い
+
+7-9f（2026-11-03）で確かめて決めたもの。手順書19節の【追記（2026-11-03）】にも要点がある。
+
+**汎用の枠（`errors.general`）に出る3種類**（`ContactController::store`）
+
+- `invalid_token`：フォームを表示した時刻を `APP_KEY` で暗号化した値（`form_token`。`ContactController::create`）が、送信のときに復号できない（`ContactRequest::detectSpam`）。値が欠けた・書き換えられた、または `APP_KEY` が変わったときに起きると読む。**CSRF のトークンではなく、期限も無く、セッションとも関係しない**
+  - 文面は「…お手数ですが、入力した内容をコピーしてから、ページを再読み込みして、もう一度お試しください。」。再読み込みすると入力が消えるため（手元で確かめた）。再読み込みせずに送り直せる仕組みは、まれなことに対して仕組みが増えるので作らない（人）
+- `too_many_urls`：本文のリンクが多すぎる
+- 送信の失敗（`TransportExceptionInterface`）
+- 3つとも文面が違い、区別できる。入力は残る（`withInput`）
+- 送信の上限（1分に3回）を超えたときは、別の枠（`flash.rate_limited`）に出る
+
+**419（CSRF の不一致）**
+
+- 今の Laravel（13.34.0）の `PreventRequestForgery` は、ブラウザが付ける `Sec-Fetch-Site: same-origin` があれば、トークンを見ずに通す。そのため、今のブラウザからは、セッションが切れていても送信は成功する（手元で確かめた）。419 になるのは、このヘッダが無いか `cross-site` のとき（`curl` で確かめた）
+- 起きたときは、`bootstrap/app.php` の `respond` が ErrorPage に変えない状態コードなので、Laravel の既定の HTML が返り、Inertia が失敗の枠（`srcdoc`）に英語の「419 | Page Expired」を出す。CSP の違反は出ない。枠を閉じれば入力は残る（応答を差し込んで確かめた）
+- 自前のエラーページには変えない（人）。ページが置き換わり、入力が消えるため（推測）
+
+**通信が切れたとき**
+
+- 送信は同期（メールを送ってから302で戻す）。メールを送った後、応答が届く前に切れると、Inertia は通信の失敗として扱い、このページにその処理が無いので、画面には何も出ず、入力は残る（コードからの推測）
+- もう一度送ると、同じメールがもう1通届く。重複を防ぐ仕組みは無い（2通届く形は手元で確かめた）
+- 今のまま（人）。再検討の条件：重複や「送れたか分からない」という声が届いたとき
