@@ -60,7 +60,8 @@ class ContactController extends Controller
             // エラーを返す層。メールは送らない。
             $message = $spamReason === SpamReason::TooManyUrls
                 ? '本文に含まれるリンクが多すぎます。リンクの数を減らして、もう一度お試しください。'
-                : '送信内容を確認できませんでした。お手数ですが、ページを再読み込みしてから、もう一度お試しください。';
+                // 再読み込みすると入力が消えるので、先にコピーするよう案内する（7-9f。手元で確かめた）
+                : '送信内容を確認できませんでした。お手数ですが、入力した内容をコピーしてから、ページを再読み込みして、もう一度お試しください。';
 
             return redirect()->back()->withInput()->withErrors(['general' => $message]);
         }

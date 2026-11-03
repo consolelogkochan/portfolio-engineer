@@ -134,7 +134,10 @@ class ContactTest extends TestCase
         ]));
 
         Mail::assertNothingSent();
-        $response->assertSessionHasErrors('general');
+        // 再読み込みで入力が消えるため、文面がコピーを先に案内していること（7-9f）
+        $response->assertSessionHasErrors([
+            'general' => '送信内容を確認できませんでした。お手数ですが、入力した内容をコピーしてから、ページを再読み込みして、もう一度お試しください。',
+        ]);
     }
 
     /** メール送信で例外（Symfony MailerのTransportExceptionInterface）が投げられた場合、
