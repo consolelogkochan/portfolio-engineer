@@ -53,7 +53,7 @@
 | `public/images/` | 画像。`og/` は og:image 用で、`images:optimize` の対象の外 | — |
 | `scripts/` | 内容の検証（`validate-content.ts`）と、CSS の未定義の変数の検査（`check-css-vars.ts`） | — |
 | `tests/Feature/` | テスト（すべて Feature。Unit のテストスイートは `phpunit.xml` に無い。Unit のテストを書くときに戻す） | — |
-| `bin/` | デプロイと巻き戻しのスクリプト（`deploy.sh`・`rollback.sh`。サーバーで動く。手順は `docs/server-setup.md`）と、デプロイの後の応答確認のスクリプト（`check-site.sh`。`deploy.yml` の `verify` が GitHub Actions で動かす。手元からも動かせる） | — |
+| `bin/` | デプロイと巻き戻しのスクリプト（`deploy.sh`・`rollback.sh`。サーバーで動く。手順は `docs/server-setup.md`）と、デプロイの後の応答確認のスクリプト（`check-site.sh`。`deploy.yml` の `verify` と、`ci.yml` の本番と同じ依存構成での表示の確認が動かす。引くパスの一覧はここだけにある。手元からも動かせる） | — |
 | `docs/images/` | README の画像（`readme-top.webp`。中身は gallery の `top-v3.webp` と同じ） | サイトが配る画像（`public/images/`。名前の規則は手順書40節）。README の画像は gallery を直接参照しない（gallery の差し替えで黙って切れるため） |
 | `.github/workflows/` | CI（`ci.yml`）とデプロイ（`deploy.yml`） | — |
 | `database/` | Laravel が用意したもの。このアプリは DB を使わない | — |
@@ -94,12 +94,13 @@
 | CI の Node の版の決まり方（`setup-node` の設定） | `.github/workflows/ci.yml` と `deploy.yml` の `actions/setup-node`（`node-version-file: package.json`・`check-latest: true`） | もう片方も同じにする | 検査と、本番に載るビルドが、別のワークフローに分かれている（21節）。版の範囲そのものは `package.json` の `engines` の1か所 | **守っていない**（2つのファイルのコメントが、両方に置くことを書いている。2026-10-27） |
 | og:image を png・jpg にすること | `types/work.ts` の `ogImage` の正規表現と、`OptimizeImages::SCAN_DIRS` から `public/images/og` を外していること | もう片方も直す | 型の検証と、画像の変換の対象は別の道具 | `PageMetaTest` が、og:image が png か jpg であることと、ファイルがあることを確かめる |
 | トップの h1 の文面 | `resources/js/Pages/Home.tsx` の h1 と、`config/page_meta.php` の `home` の `description` | もう片方も直す | 表示の文面と meta の説明は届き先が違う | **守っていない**（両方のコメントが互いを指す。台帳 41-12 の写しの行） |
-| 固定のページのパス | `routes/web.php` と、`SitemapController::index()`・`ci.yml` の表示の確認・`FaviconTest` | ページを足したら、サイトマップに足すかを決める | 目的が違う（サイトマップは全部を載せる。CI とテストは、壊れたら困るものだけを引く） | サイトマップは**守っていない**。CI とテストは、無くなったパスで落ちる |
+| 固定のページのパス | `routes/web.php` と、`SitemapController::index()`・`bin/check-site.sh` の一覧（CI の表示の確認と `deploy.yml` の `verify` が使う）・`FaviconTest` | ページを足したら、サイトマップに足すかを決める | 目的が違う（サイトマップは全部を載せる。CI とテストは、壊れたら困るものだけを引く） | サイトマップは**守っていない**。CI とテストは、無くなったパスで落ちる |
 | タイトルの組み立ての規則 | `PageMetaBuilder::fullTitle()`・`titleSuffix()` と、`PageMetaTest` の中の組み立て | 規則を変えたらテストも直す | テストは本体と別に組み立てて照らすことに意味がある | テスト（食い違えば落ちる） |
 | local・testing ではエラーのページを描かない、という説明 | `bootstrap/app.php` の `respond()`、`PageMetaTest`・`SharedPropsTest` の説明 | 3か所の説明を直す | どのファイルから読んでも分かるようにするため | **守っていない**（コメント） |
 | 別名 `@`（`resources/js`） | `vite.config.js`・`tsconfig.json`・`scripts/tsconfig.json` | 3か所とも直す | 道具ごとに設定の置き場所が決まっている | `vite.config.js` は CI のビルド、`tsconfig.json` は CI の `tsc`。`scripts/tsconfig.json` は CI で型の確認をしていない（6節） |
 | 本物のコンテンツの slug（`portfolio-engineer`）に頼るテスト | `WorkVisibilityTest`・`PageMetaTest`・`FaviconTest`・`ContentDefaultsTest` | slug を変えたらテストも直す | コンテンツの置き場所を差し替える仕組みが無い（`WorkVisibilityTest` の説明。`BrokenFrontMatterTest` だけは、アプリの基点のパスを一時ディレクトリに替えている） | テスト（slug が変われば落ちる） |
 | キャッシュを作って確かめる手順 | `bin/deploy.sh` と `bin/rollback.sh` | もう片方も直す | それぞれをサーバーで単独で読めることを優先する | **守っていない**（CI の shellcheck は書き方だけを見る） |
+| 作品の `metrics` の数（CI の自動検査・テスト） | `content/works/portfolio-engineer.md` の `metrics` と、`ci.yml`・`php artisan test`（数え方は6節） | テストや CI の段を変えるコミットで、同じく `metrics` の数も直す。数が変わっただけでは、作品詳細の gallery の画像は撮り直さない（画面の写真は撮った時点のもの） | ページの構成として、数があったほうが視覚の印象が違う。数の裏づけは6節の一覧（人。7-9g） | **守っていない**（人が同じコミットで直す） |
 | 公開の後の運用 | 正は手順書（`docs/server-setup.md`）と台帳（`docs/ledger.md`）。一覧は `docs/operations.md` | `docs/operations.md` も直す | 一目で網羅を点検するための索引で、正の記録の置き場所とは目的が違う | **守っていない**（人が直す） |
 
 ## 5. 様式の規則
@@ -124,23 +125,140 @@
 
 ## 6. 確認の道具と範囲
 
-| 道具 | いつ | 見るもの |
-| --- | --- | --- |
-| lint-staged（`lint-staged.config.js`。`.husky/pre-commit` が Sail の中で動かす） | コミットの前（ステージしたファイル） | js・ts・tsx：ESLint（`--fix`）と Prettier。json・yml・yaml・css：Prettier。php：Pint。`content/` の md：内容の検証の全件。`resources/` の css・ts・tsx：ビルドと CSS の変数の検査 |
-| CI（`.github/workflows/ci.yml`） | `main` への push と PR | shellcheck（`bin/*.sh`）、`tsc --noEmit`、`npm run lint`、`npm run format:check`、`pint --test`、`composer audit`、`npm audit`（2段）、ビルド、CSS の変数の検査、`php artisan test`、内容の検証、本番と同じ依存（`--no-dev`）での表示の確認（`ci.yml` の最後の手順が引くパス） |
+何が、どんな意図で確かめているか、何を見ていないかの一覧である（7-9g で広げた。2026-11-04）。抜け漏れと一貫性は、この節で点検する。
 
-**対象の外**：
+- 意図の正は、各行の「意図の正の場所」にある。ここには要点だけを書き、理由の全文は写さない
+- 確かめの道具・範囲・段を変えるコミットでは、この節も同じコミットで直す（この文書の「更新の規則」）
+
+### 6-1. 自動で動くもの
+
+**CI（`.github/workflows/ci.yml`）**：`main` への push と PR で動く。段は上から順に動き、1つが失敗すればそこで止まる。ジョブの上限は15分で、権限はリポジトリの読み取りだけ（`ci.yml` のコメント）。
+
+| 段 | 確かめること | 失敗の条件 | 意図 | 意図の正の場所 |
+| --- | --- | --- | --- | --- |
+| `shellcheck --severity=warning bin/*.sh` | `bin/` のシェルの書き方 | warning 以上が1件でも | シェルの誤りを、Node・PHP の準備より先に見つける。info は版によって出たり出なかったりするので対象にしない | `ci.yml` のコメント、手順書30節 |
+| `npx tsc --noEmit` | `resources/js` の型（`tsconfig.json`。`scripts/` は見ない） | 型の誤り | **記録が無い**（3-11 で入れた） | — |
+| `npm run lint` | ESLint（`eslint.config.js`） | error | **記録が無い**（3-11） | — |
+| `npm run format:check` | Prettier の整形 | 整形されていないファイル | 様式（5節）。対象の外は下の 6-6 | `.prettierignore` |
+| `./vendor/bin/pint --test` | PHP の整形（Blade は見ない。6-6） | 整形されていないファイル | 様式（5節） | 5節 |
+| `composer audit` | PHP の依存の勧告 | 1件でも | 勧告のある依存を本番に載せない | 手順書21節 |
+| `npm audit --omit=dev --audit-level=high` | 本番に載る npm の依存の勧告 | high 以上 | 本番に載るものは厳しく見る | `ci.yml` のコメント、手順書21節 |
+| `npm audit --audit-level=critical` | 開発の依存を含む全部の勧告 | critical | 開発だけのものは緩く見る | 同上 |
+| `npm run build` | ビルドが通る | ビルドの失敗 | **記録が無い**（3-11）。後の CSS の変数の検査とテストは、この成果物を使う | `ci.yml` のコメント（テストの段） |
+| `npm run check:css-vars` | CSS の未定義の変数（`var(--名前)`） | 1件でも | 名前を間違えると、ほかの検査を通り、画面が黙って崩れる | `ci.yml` のコメント、手順書30節 |
+| `php artisan test` | テスト（6-2） | 1件でも失敗 | 6-2 | 各テストのファイル |
+| `npx tsx scripts/validate-content.ts` | `content/` の front matter（Zod のスキーマ）と、作品の front matter の画像（`thumbnail`・`ogImage`・`gallery`）が `public/` にあること | 1件でも | 段を入れた意図は**記録が無い**（4-5 で入れた）。画像を見る意図は、差し替えのたびに参照を書き換えるので書き間違いの機会があるため | スクリプトのコメント（画像の分） |
+| `composer install --no-dev` と、本番と同じ依存での表示の確認 | 本番と同じ依存で手元にサーバーを立て、`bin/check-site.sh` の一覧のパスが `200` を返す | `200` でないパス | `require` と `require-dev` の振り分けの誤りは、開発の環境では気づけず、本番でだけ500 になる（実際に起きた） | `ci.yml` のコメント、手順書31節 |
+
+- 作品の `metrics` の「CI の自動検査 14」は、`ci.yml` の `run:` の18個から、準備の4つ（`composer install`・`.env` の写し・`key:generate`・`npm ci`）を除いた数。上の表の最後の行は、`run:` の2つ（入れ直しと表示の確認）にあたる
+- 引くパスの一覧は `bin/check-site.sh` の1か所にあり、`deploy.yml` の `verify` と同じものを引く。固定のページに加えて、作品と開発ログの詳細を1件ずつ引く（理由はスクリプトのコメント）
+
+**pre-commit**（`.husky/pre-commit` が Sail の中で lint-staged を動かす。対象は `lint-staged.config.js`）：コミットの前に、ステージしたファイルについて動く。
+
+| 対象 | 動くもの |
+| --- | --- |
+| js・ts・tsx | ESLint（`--fix`）と Prettier |
+| json・yml・yaml・css | Prettier |
+| php | Pint |
+| `content/` の md | 内容の検証（全件） |
+| `resources/` の css・ts・tsx | ビルドと CSS の変数の検査 |
+
+- pre-commit で動くものは、どれも CI でも動く。型・テスト・shellcheck・依存の検査・本番と同じ依存での表示の確認は、CI だけで動く
+
+**デプロイ（`.github/workflows/deploy.yml`）**：人が CI の緑を確かめてから、手で起動する（手順書30節）。`build` はテストや検査を動かさない（CI の役目）。
+
+| ジョブ | 確かめること | 失敗の条件 | 正の場所 |
+| --- | --- | --- | --- |
+| `build` | `npm ci` とビルドが通る。成果物に、ビルドしたコミットのハッシュを添える | ビルドの失敗 | 手順書30節 |
+| `deploy` | `bin/deploy.sh` の終了コード。成果物とコミットの一致、作業ツリーとブランチ、`vendor/` のずれ、キャッシュが作られたかを見る | 0 でない | 手順書30節、`bin/deploy.sh` |
+| `verify` | `bin/check-site.sh` で、公開の URL の一覧のパスが `200` を返す（接続できないときと 5xx は、3回まで引き直す） | `200` でないパス | 手順書30節の「デプロイの後の応答確認（7-9c）」 |
+
+### 6-2. テスト
+
+`php artisan test`（PHPUnit。`tests/Feature/`）。件数は PHPUnit の数え方で、データの組を含む（2026-11-04 に59件）。
+
+| まとまり | 件数 | 確かめること | ファイル |
+| --- | --- | --- | --- |
+| 問い合わせ | 16 | 送信、スパムの判定（静かに捨てる・エラーを返す）、送信の失敗のときの文面とログ、`invalid_token` の文面、Reply-To、件名と名前の改行がヘッダを足さないこと、訪問者の本文の Markdown の変換（リンク・画像・生の HTML を外す） | `ContactTest`・`ContactMailHeaderTest`・`ContactMailTest` |
+| ページのメタ情報 | 14 | 各ページの meta タグ、og:image のファイルがあることと png・jpg であること、作品の ogImage の差し替え、robots.txt | `PageMetaTest`・`RobotsTxtTest` |
+| 内容 | 15 | 壊れた front matter を1件として飛ばすこと、日付の扱い、PHP の既定値、公開の状態（非公開の作品が404 で、一覧・サイトマップ・開発ログのリンクに出ない） | `BrokenFrontMatterTest`・`ContentDefaultsTest`・`WorkVisibilityTest` |
+| 画面の共有とアイコン | 7 | サイト名がページとエラーのページ（ルートに一致しない要求）に届くこと、アイコンのリンクとファイル | `SharedPropsTest`・`FaviconTest` |
+| 応答ヘッダ | 5 | CSP のヘッダが付くことと中身、開発サーバーの動いているときは付けないこと | `ContentSecurityPolicyTest` |
+| 様式と設定 | 2 | 自前の PHP の `strict_types`、既定値を書かずに読む設定のキーがあること | `StrictTypesTest`・`ConfigKeysTest` |
+
+- テストは、開発の依存（`require-dev` あり）と testing の環境で動く（6-5）
+- 本物のコンテンツの slug に頼るテストがある（4節）
+
+### 6-3. 手で動かすもの
+
+| 道具 | いつ | 見るもの | 正の場所 |
+| --- | --- | --- | --- |
+| `npx tsx scripts/validate-content.ts` | 内容を書いたとき（pre-commit と CI でも動く） | 6-1 の内容の検証と同じ | — |
+| `npm run check:css-vars` | CSS を変えたとき（ビルドの後。pre-commit と CI でも動く） | 6-1 と同じ | 手順書30節 |
+| `bin/check-site.sh <URL>` | 手元のサーバー（`http://localhost`）や本番に向けて、表示を確かめたいとき | 一覧のパスが `200` を返すか。本番に向けると、パスの数だけ読み取りの要求を送る | スクリプトのコメント |
+| `npx tsc -p scripts/tsconfig.json` | `scripts/` を変えたとき | `scripts/` の型（CI に無い。6-6） | — |
+| `composer audit` と `npm audit`（CI と同じ引数） | 毎月1日と17日の点検（手元のコンテナで） | push しない期間に出た勧告 | 手順書40節、[`docs/operations.md`](operations.md) |
+| ブラウザでの CSP の違反の確かめ | 外の読み込み先を足すとき、zod などの大きな版を上げるとき | 手元のヘッドレスの Chrome でページを開き、コンソールに CSP の違反が出ないか（7-9e で行った。スクリプトはリポジトリの外） | 10節 |
+
+### 6-4. 人が見るもの
+
+| 何を | いつ | 正の場所 |
+| --- | --- | --- |
+| ブラウザでトップを開いて表示を見る。コンソールに CSP のエラーが出ていないことを見る | デプロイの後（`verify` に足す確かめ） | 手順書30節、[`docs/operations.md`](operations.md) の2節 |
+| サイトが開けること、転送、問い合わせを1通送ることなど | 月次の点検 | [`docs/operations.md`](operations.md) の1節 |
+
+### 6-5. 見ていないもの（受け入れた穴）
+
+| 見ていないもの | 受け入れた理由 | 再検討の条件 | 正の場所 |
+| --- | --- | --- | --- |
+| README の画像（`docs/images/readme-top.webp`）の参照が切れても、気づかない（内容の検証は `content/` だけを見る） | README の画像は gallery から切り離してあり、壊れるのは `docs/images/` のファイルを動かしたときだけ（人。7-9g） | README の画像を増やすとき | 台帳 41-9 |
+| ブラウザで CSP の違反を拾う仕組みが CI に無い。テストは、ヘッダが付くことと中身だけを見る | ブラウザを CI で動かす仕組みを持ち続けることになる（人。7-9g）。代わりに、デプロイの後に人がコンソールを見る（6-4） | 外の読み込み先を足すとき、zod などの大きな版を上げるとき | 10節、台帳 41-9 |
+| テストは開発の依存と testing の環境で動き、本番の構成でだけ起きる欠けは見ない | 本番と同じ依存（`--no-dev`）では PHPUnit が消えるので、テストを動かせない（`ci.yml` のコメント）。本番と同じ依存での表示の確認が、一覧のパスについてだけ補う | 決めていない | `ci.yml` のコメント |
+| 表示の確認と `verify` は状態コードだけを見る。表示の中身は見ない。詳細のページは作品と開発ログの1件ずつ | 中身はデプロイの後に人が見る（手順書30節の判断）。slug を全件並べると、作品を足すたびに直すことになる | — | 手順書30節、`bin/check-site.sh` のコメント |
+| メンテナンスモード（`php artisan down`）の503 で、サイト名が届くかを確かめていない。テストも足さない | デプロイはメンテナンスモードを使っていない（`bin/deploy.sh`、手順書30節） | デプロイで `php artisan down` を使うようにするとき | 台帳 41-7 |
+
+### 6-6. 道具の対象の外
 
 | 範囲 | 理由 |
 | --- | --- |
 | Markdown（`content/`・`docs/`・README など）の整形 | 書く人が形を決める文章のため（`.prettierignore`） |
 | `composer.json`・`package-lock.json`・`compose.yaml` の整形 | ほかの道具が書く、または雛形のため（`.prettierignore`） |
-| `scripts/` の型の確認（`tsc -p scripts/tsconfig.json`） | CI の手順に無い。手元で動かす |
+| `scripts/` の型の確認（`tsc -p scripts/tsconfig.json`） | CI の手順に無い。手元で動かす（6-3） |
 | Blade（`resources/views/`）の整形 | 規則が無い。Prettier は扱わない。pre-commit は `**/*.php` に当たる Blade も Pint に渡すが、CI の `pint --test` は Blade を見ない（`pint --test` が見るファイルの数が、Blade を除いた PHP のファイルの数と同じだった） |
 | Laravel が用意した PHP の `strict_types` | 付けない（5節） |
 | テスト・型の確認・shellcheck・依存の検査 | pre-commit では動かさない。CI だけ |
 
-ゲートの設定（`ci.yml` の手順や順番、lint-staged の対象）を変えたときは、わざと壊して止まることを確かめる。規則は台帳 41-7 のゲートの行にある。
+### 6-7. 書かないと決めたもの
+
+| もの | 理由 | 再検討の条件 | 正の場所 |
+| --- | --- | --- | --- |
+| 作品詳細の開発ログと GitHub へのリンクのテスト | リンクは出ないことが正しい場合があり、黙って切れうるのはコードではなくデータの側（slug の不一致、開発ログの `draft`） | 作品または開発ログの slug を変えるとき、開発ログのファイルを移すとき | 台帳 41-7 |
+
+### 6-8. 同期を守るもの・守るものが無い箇所
+
+確かめの道具に関わるものだけを挙げる。表の全体は4節。
+
+| 事実 | 守るもの |
+| --- | --- |
+| 作品と開発ログの既定値（TS と PHP） | PHP の値は `ContentDefaultsTest` が守る。2か所の一致は**守っていない**（4節） |
+| 問い合わせのバリデーションの規則と文言（PHP と TS） | **守っていない**（4節） |
+| 作品の `metrics` の数（CI の自動検査・テスト） | **守っていない**。テストや CI の段を変えるコミットで、人が同じく直す（4節） |
+| 表示の確認で引くパス（CI と `verify`） | 同期は要らない（`bin/check-site.sh` の1か所） |
+| `bin/check-site.sh` の詳細のページの slug と、`content/` のファイルの名前 | slug を変えて直さなければ、404 で CI が赤になる |
+| 本物のコンテンツの slug に頼るテスト | テスト（slug が変われば落ちる。4節） |
+
+### 6-9. 決まり
+
+- ゲートの設定（`ci.yml` の手順や順番、lint-staged の対象）を変えたときは、わざと壊して止まることを確かめる。規則は台帳 41-7 のゲートの行にある
+- テストや CI の段を変えるコミットでは、作品の `metrics` の数も直す（4節）
+- デプロイは、人が CI の緑を確かめてから起動する（手順書30節）
+
+### 6-10. 理由の記録が無いもの
+
+| もの | 扱い |
+| --- | --- |
+| `.npmrc` の `ignore-scripts=true`（CI と開発の環境の `npm ci` にも効く） | 7-10 で扱う（台帳 41-8。7節） |
+| CI の `tsc`・lint・ビルド・内容の検証の段を入れた意図 | 6-1 の表に「記録が無い」と書いた |
 
 ## 7. 注意
 
@@ -243,7 +361,7 @@
 - 開発のとき（`Vite::isRunningHot()`、`public/hot` がある）は付けない。開発サーバーのスクリプトと WebSocket、`@viteReactRefresh` のインラインのスクリプトが止まるため
 - 入れ方：Report-Only を使わず、手元の本番と同じ形のビルドで、ページの移動・gallery・空の送信・404 の違反が0件であることを確かめてから、止める形で入れた（人）
 - zod：`resources/js/types/contact.ts` の `z.config({ jitless: true })`。zod が起動のときに行う `new Function` の試しが、CSP の違反としてコンソールに毎回出るのを止める。CSP の下では試しが失敗して同じ検証の道を使うので、動きは変わらない。コンソールにいつもエラーが出ると、人の確かめで本当のエラーと区別できなくなるため（人）。`'unsafe-eval'` を許す案は、守りを弱めるので取らない（人）
-- テスト：`tests/Feature/ContentSecurityPolicyTest.php` の5件。トップ・作品詳細・問い合わせ・404 で値が全文一致すること、開発サーバーが動いているときに付かないこと。期待の値は定数を参照せず、文字列で書いている。実際のブラウザで違反を拾う仕組みは無い（台帳 41-15）
+- テスト：`tests/Feature/ContentSecurityPolicyTest.php` の5件。トップ・作品詳細・問い合わせ・404 で値が全文一致すること、開発サーバーが動いているときに付かないこと。期待の値は定数を参照せず、文字列で書いている。実際のブラウザで違反を拾う仕組みは無い（受け入れた。6節の 6-5）
 - 再検討の条件：訪問者が書いたものを表示するようになったとき
 
 **同じことを2か所で言っているもの**
