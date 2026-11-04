@@ -7,7 +7,7 @@
 **読み方**：
 
 - 3節「事実の正の置き場所」と4節「同期が要る箇所」は、コードを変える前に見る。変える事実の正がどこにあり、ほかに直す場所があるかが分かる
-- 5節「様式の規則」は、規則ごとに、守っている道具を書いた。「道具で守っていない」と書いた規則は、レビューで見る
+- 5節「様式の規則」は、規則ごとに、それを確認するツールを書いた。「ツールでの確認は無い」と書いた規則は、レビューで見る
 - 7節「注意」は、知ったうえで受け入れて残しているもの。直す前に、受け入れた理由と再検討の条件を見る
 
 **更新の規則**：
@@ -89,7 +89,7 @@
 | 作品と開発ログの既定値（`.default(...)`） | `types/work.ts`・`types/log.ts` と、`ContentRepository` の `WORK_DEFAULTS`・`LOG_DEFAULTS` | もう片方も同じ値にする | TS は内容の検証と型のため、PHP は画面に渡す値のため。既定値を JSON のファイルに置いて両方から読む案は、少ない値のために読み込みの仕組みが増え、見合わないとして採らなかった（7-8b-5）。再検討の条件：TS と PHP の値が食い違うことが起きたとき、または既定値のある項目が増えたとき | PHP の値はテストで保つ（`ContentDefaultsTest`）。2か所の一致は、**仕組みは無い。人が同じコミットで直す** |
 | 問い合わせのバリデーションの規則と文言 | `ContactRequest::rules()`・`messages()` と `types/contact.ts` | もう片方も直す | 言語をまたぎ、一致を確かめるテストを書きにくい（7-5c-2）。再検討の条件：文言を変えるとき、または項目を増やすとき | **仕組みは無い。人が同じコミットで直す** |
 | 作品の公開の状態の値 | `ContentRepository::STATUS_PUBLISHED` と `types/work.ts` の `status` | もう片方も直す | 言語をまたぐ | **仕組みは無い。人が同じコミットで直す**（`STATUS_PUBLISHED` の説明が TS 側を指す） |
-| 日付の扱い | PHP：`ContentParser`（引用符の無い日付も受け付ける）。TS：`isoDate`（文字列だけを受け付け、引用符の無い日付は Date になって止まる） | 日付の扱いを変えるときは両方を見る | TS は門番（CI と pre-commit）、PHP は本番での備え。PHP は文字列でない日付を壊れた1件として飛ばす | **守っていない**（食い違ったまま。TS が先に止めるので、CI を通った内容では表に出ない） |
+| 日付の扱い | PHP：`ContentParser`（引用符の無い日付も受け付ける）。TS：`isoDate`（文字列だけを受け付け、引用符の無い日付は Date になって止まる） | 日付の扱いを変えるときは両方を見る | TS は門番（CI と pre-commit）、PHP は本番での備え。PHP は文字列でない日付を壊れた1件として飛ばす | **一致させていない（意図して食い違わせている）**。TS が先に止めるので、CI を通った内容では表に出ない |
 | front matter の型（`title`・`ogImage` など） | Zod のスキーマと、PHP の型つきの引数（`PageMetaBuilder::fullTitle()`・`absoluteUrl()`） | スキーマを緩めるときは、PHP の受け取り方も見る | 型の正当性は Zod に任せる分担 | CI と pre-commit の内容の検証（Zod）。Zod を通らない内容は PHP で `TypeError` になる（7節） |
 | CI の Node の版の決まり方（`setup-node` の設定） | `.github/workflows/ci.yml` と `deploy.yml` の `actions/setup-node`（`node-version-file: package.json`・`check-latest: true`） | もう片方も同じにする | 検査と、本番に載るビルドが、別のワークフローに分かれている（21節）。版の範囲そのものは `package.json` の `engines` の1か所 | **仕組みは無い。人が同じコミットで直す**（2つのファイルのコメントが、両方に置くことを書いている。2026-10-27） |
 | og:image を png・jpg にすること | `types/work.ts` の `ogImage` の正規表現と、`OptimizeImages::SCAN_DIRS` から `public/images/og` を外していること | もう片方も直す | 型の検証と、画像の変換の対象は別の道具 | `PageMetaTest` が、og:image が png か jpg であることと、ファイルがあることを確かめる |
@@ -106,23 +106,23 @@
 
 ## 5. 様式の規則
 
-| 対象 | 規則 | 守っているもの |
+| 対象 | 規則 | 確認するツール |
 | --- | --- | --- |
 | PHP | 自前のファイルには `declare(strict_types=1);` を付ける。範囲は `tests/Feature/StrictTypesTest.php` の `OWN_PATHS`。Laravel が用意したファイル（ほかの `config/`・`bootstrap/providers.php`・`database/`・`public/index.php`）には付けない | テスト（`StrictTypesTest`。範囲の外は見ない） |
 | PHP | 整形は Pint の既定（Laravel の preset。`pint.json` は無い） | pre-commit（lint-staged の `**/*.php`）と CI（`pint --test`） |
-| PHP | クラスの定数は型を付ける（`private const array …`） | 道具で守っていない（レビューで見る） |
+| PHP | クラスの定数は型を付ける（`private const array …`） | ツールでの確認は無い（レビューで見る） |
 | PHP | 字下げは4（`.editorconfig` の `[*]`） | Pint |
 | TS・JS | 書き方は ESLint（`eslint.config.js`）、整形は Prettier（`.prettierrc`。字下げは2）。対象から外すものは `.prettierignore` に理由と一緒に書く | pre-commit と CI（`npm run lint`・`format:check`） |
 | TS | 型は strict（`tsconfig.json`） | CI（`tsc --noEmit`。`scripts/` は見ない） |
-| TS | Zod は今の書き方（`z.email()`・`z.url()` のような最上位の形） | 道具で守っていない |
-| 字下げ（エディタ） | `.editorconfig`：Prettier が扱うもの（js・ts・tsx・json・css・`.prettierrc`）と yml は2、`composer.json` と `compose.yaml` は4、そのほかは4 | Prettier が整形する範囲は Prettier。ほかは道具で守っていない |
-| CSS | 色は semantic 層の変数を使う。部品で色を直接書かない | 道具で守っていない。未定義の変数だけは `check:css-vars`（pre-commit と CI） |
-| CSS | 画面幅の区切りは Tailwind の区切り（クラスの `md:`、CSS の中は `@variant md`）。`@media` に幅を手で書かない | 道具で守っていない |
-| コメント | 日本語で書く。今の事実を書き、作業のメモや予定（「〜に変更」「〜で要判断」）を残さない。事実と違うコメントを残さない。同じ説明を写さず、正の1か所を指す | 道具で守っていない |
-| 命名 | PHP：クラスは PascalCase、メソッドは camelCase、定数は大文字のスネークケース、enum の case は PascalCase。TS：部品のファイルと名前は PascalCase、フックは `use` で始める。front matter のキーは camelCase。slug はファイル名（拡張子なし） | 道具で守っていない（フックの使い方は ESLint の react-hooks の規則が見る） |
+| TS | Zod は今の書き方（`z.email()`・`z.url()` のような最上位の形） | ツールでの確認は無い（レビューで見る） |
+| 字下げ（エディタ） | `.editorconfig`：Prettier が扱うもの（js・ts・tsx・json・css・`.prettierrc`）と yml は2、`composer.json` と `compose.yaml` は4、そのほかは4 | Prettier が整形する範囲は Prettier。ほかは、ツールでの確認は無い（レビューで見る） |
+| CSS | 色は semantic 層の変数を使う。部品で色を直接書かない | ツールでの確認は無い（レビューで見る）。未定義の変数だけは `check:css-vars`（pre-commit と CI） |
+| CSS | 画面幅の区切りは Tailwind の区切り（クラスの `md:`、CSS の中は `@variant md`）。`@media` に幅を手で書かない | ツールでの確認は無い（レビューで見る） |
+| コメント | 日本語で書く。今の事実を書き、作業のメモや予定（「〜に変更」「〜で要判断」）を残さない。事実と違うコメントを残さない。同じ説明を写さず、正の1か所を指す | ツールでの確認は無い（レビューで見る） |
+| 命名 | PHP：クラスは PascalCase、メソッドは camelCase、定数は大文字のスネークケース、enum の case は PascalCase。TS：部品のファイルと名前は PascalCase、フックは `use` で始める。front matter のキーは camelCase。slug はファイル名（拡張子なし） | ツールでの確認は無い（レビューで見る。フックの使い方は ESLint の react-hooks の規則が見る） |
 | エラーの扱い | 外から来るデータ（ファイル・front matter・リクエスト）の形が違うときは、黙って補わず、壊れたものとして扱う。コンテンツは `ContentParseException` にして、一覧ではその1件を飛ばす | テスト（`BrokenFrontMatterTest`） |
 | エラーの扱い | 設定は、呼び出し側で既定値を書かずに読む（キーを消したことを隠さないため） | テスト（`ConfigKeysTest`。今あるキーだけを見る） |
-| 本文の HTML | 著者が書く本文は `MarkdownRenderer`、運営者以外が書く本文は `UntrustedMarkdownRenderer` で変換する | 問い合わせのメールは `ContactMailTest`。どちらを使うかは道具で守っていない |
+| 本文の HTML | 著者が書く本文は `MarkdownRenderer`、運営者以外が書く本文は `UntrustedMarkdownRenderer` で変換する | 問い合わせのメールは `ContactMailTest`。どちらを使うかは、ツールでの確認は無い（レビューで見る） |
 
 ## 6. 品質の確認
 
