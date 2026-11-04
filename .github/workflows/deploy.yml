@@ -94,7 +94,7 @@ jobs:
   # 鍵を持つ deploy ジョブとは別のマシンで動かし、そこではリポジトリのコードを動かさない。
   # 引くのは公開の URL なので、secrets にしない（秘密ではない）。
   # timeout-minutes は、bin/check-site.sh が引き直しを使い切ったときの最長
-  # （6本 ×（15秒 × 3回 ＋ 5秒 × 2回）＝ 330秒）より長くとる。
+  # （パスの数 ×（15秒 × 3回 ＋ 5秒 × 2回）。今の8本で440秒）より長くとる。
   verify:
     needs: deploy
     runs-on: ubuntu-latest

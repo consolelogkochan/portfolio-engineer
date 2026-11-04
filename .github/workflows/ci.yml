@@ -89,9 +89,7 @@ jobs:
       # --no-dev は phpunit を消すため、php artisan test より後に置く。
       - run: composer install --no-dev --optimize-autoloader --no-progress
 
-      # 固定パスだけを引く。個別スラッグを列挙するとページ追加のたびに CI 修正が要るため。
-      # /sitemap.xml は works と logs を全件走査するのでコンテンツ増加に自動で追随する。
-      # /about は Markdown レンダリング経路、/contact は front matter を通らない暗号化経路を通す。
+      # 引くパスの一覧は bin/check-site.sh の1か所にある（deploy.yml の verify と同じものを引く）。
       - run: |
           php artisan serve --port=8000 > /tmp/serve.log 2>&1 &
           ready=""
@@ -107,8 +105,4 @@ jobs:
             cat /tmp/serve.log >&2
             exit 1
           fi
-          for path in / /works /about /contact /sitemap.xml /robots.txt; do
-            code=$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:8000$path")
-            echo "$path  $code"
-            [ "$code" = "200" ] || { echo "FAILED: $path -> $code" >&2; cat /tmp/serve.log >&2; exit 1; }
-          done
+          bin/check-site.sh http://127.0.0.1:8000 || { cat /tmp/serve.log >&2; exit 1; }
