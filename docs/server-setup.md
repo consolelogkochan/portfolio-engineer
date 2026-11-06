@@ -2360,7 +2360,7 @@ sudo chmod g-w,o-rwx /var/www/portfolio/bootstrap/cache/.gitignore
 流れ（サーバーへは作業用の鍵で入る）：
 
 1. 漏れた場合だけ：サーバーの `~/.ssh/authorized_keys` から、CI の鍵の古い行を消す。作業用の鍵の行は残す
-2. 開発機で新しい鍵の組を作る。サーバーでは作らない（上の「秘密の置き場所」の理由）。種類と形は、今の CI の鍵と同じにする。今の鍵の種類は記録が無いため、本番の `authorized_keys` の CI の鍵の行で、先頭の `restrict,command=…` の後に書かれている種類の名前を見る（`sshd(8)` の AUTHORIZED_KEYS FILE FORMAT：オプション、鍵の種類、鍵、コメントの順）
+2. 開発機で新しい鍵の組を作る。サーバーでは作らない（上の「秘密の置き場所」の理由）。種類と形は、今の CI の鍵と同じにする。今の鍵の種類は記録が無いため、本番の `authorized_keys` の CI の鍵の行で、先頭の `restrict,command=…` の後に書かれている種類の名前を見る（`sshd(8)` の AUTHORIZED_KEYS FILE FORMAT：オプション、鍵の種類、鍵、コメントの順）。パスフレーズは付けない（CI が人の手を介さずに使うため。2節の作業用の鍵とは扱いが違う）。今の鍵にパスフレーズが無いことは、GitHub の secrets にパスフレーズの欄が無いことからの推測で、確かめていない。
 3. サーバーの `~/.ssh/authorized_keys` に、新しい公開鍵の行を足す。行の先頭は、今の行と同じ `restrict,command="/var/www/portfolio/bin/deploy.sh"` にする（上の「鍵ごとに操作を絞る」の写し）
 4. GitHub のリポジトリ secrets の `SSH_PRIVATE_KEY` を、新しい秘密鍵に差し替える。ほかの3つ（`SSH_HOST`・`SSH_USER`・`SSH_KNOWN_HOSTS`）は、サーバーが変わらなければそのまま
 5. CI の緑を確かめてから `Deploy` を1回動かし、`build`・`deploy`・`verify` の3つが緑になることを見る（上の「起動する人が確認すること」）
