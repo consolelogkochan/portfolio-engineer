@@ -3450,32 +3450,54 @@ New, TLSv1.3, Cipher is TLS_AES_256_GCM_SHA384
 
 本番の `/etc/nginx/sites-available/portfolio` を変えるときの流れ。7-7d（2026-10-13）・7-9c（2026-10-31）・7-9e（2026-11-02）の3回、この流れで行った。文面とコマンドは、7-9e の当日の手順（作業の記録。リポジトリの追跡の外）から写した。控えの名前は、7-7d・7-9c と同じ `portfolio.bak` にした（7-9e は `portfolio.bak-hsts`）。
 
+【更新（2026-11-08）】次の3つを足した（7-10c）。
+
+- 段1「変える前に、写しと本番を突き合わせる」を足した。これに合わせて、後の段の番号を1つずつ送った
+- 控えの名前を、日付を入れた形（`portfolio.bak-年月日`）にした。固定の名前だと、次に変えるときに前の控えを上書きするため。上の `portfolio.bak`・`portfolio.bak-hsts` は、3回で使った名前として残す
+- 終わりに、`default-deny` を変えるときの1文を足した
+
 0. **今の状態を見る**（手元のターミナル）。変えた後と比べるため、変える前の応答を見ておく（7-7d は応答ヘッダを8つの URL で、7-9e はヘッダを見た）
 
    ```bash
    curl -sI https://new.ikshowcase.site/
    ```
 
-1. **控えを取る**（本番）
+1. **変える前に、写しと本番を突き合わせる**（7-10c で足した段。まだ実行していない）。本番の指紋を取り、この節の写しの指紋と比べる
 
    ```bash
-   sudo cp -p /etc/nginx/sites-available/portfolio /etc/nginx/sites-available/portfolio.bak
+   sudo sha256sum /etc/nginx/sites-available/portfolio
+   ```
+
+   写しの側の指紋は、上の「本番と、このブロックを突き合わせる手段」の `awk … | shasum -a 256` で出す。**違っていれば、変える前に、写しを本番に合わせる。** 先に全文を比べて、どこがずれているかを記録してから合わせる。理由：7-7d で、変えようとしたときに写しと本番がすでに食い違っていた。変える前に突き合わせないと、変えた後の突き合わせで、どこからずれたのかが分からない
+
+2. **控えを取る**（本番）。控えの名前に、その日の日付を入れる
+
+   ```bash
+   bak=/etc/nginx/sites-available/portfolio.bak-$(date +%Y%m%d)
+   sudo cp -p /etc/nginx/sites-available/portfolio "$bak"
    ls -l /etc/nginx/sites-available/
    ```
 
-   期待：`portfolio` と `portfolio.bak` が、同じ大きさで並ぶ。控えは `sites-available` にあり、`sites-enabled` には無いので、読み込まれない。
+   期待：`portfolio` と `portfolio.bak-年月日` が、同じ大きさで並ぶ。控えは `sites-available` にあり、`sites-enabled` には無いので、読み込まれない。
 
-2. **変える**（本番）。変える中身ごとに、行を文字列で指定して変える（7-9e は `sed` で行を足し、7-9c は1行ずつ文字列を指定した `sed` で消した。33節）。変える前に、該当の行がいくつあるかを `grep` で見て、期待と違えばここで止める（7-9e）。コマンドは、本番の写しで同じ文面のまま先に試しておく（7-9e）
-
-3. **控えと `diff` で、変えた行を見る**（本番）
+   この後の段は、同じシェルで続ける（`$bak` を使う）。シェルを閉じたときは、`ls -l /etc/nginx/sites-available/` で控えが1つだけであることを見てから、次で `bak` を設定し直す。
 
    ```bash
-   diff /etc/nginx/sites-available/portfolio.bak /etc/nginx/sites-available/portfolio
+   bak=$(ls -d /etc/nginx/sites-available/portfolio.bak-* | tail -n 1)
+   echo "$bak"
+   ```
+
+3. **変える**（本番）。変える中身ごとに、行を文字列で指定して変える（7-9e は `sed` で行を足し、7-9c は1行ずつ文字列を指定した `sed` で消した。33節）。変える前に、該当の行がいくつあるかを `grep` で見て、期待と違えばここで止める（7-9e）。コマンドは、本番の写しで同じ文面のまま先に試しておく（7-9e）
+
+4. **控えと `diff` で、変えた行を見る**（本番）
+
+   ```bash
+   diff "$bak" /etc/nginx/sites-available/portfolio
    ```
 
    期待：変えた行だけが出る。**これ以外の行が出たら、reload せずに「戻す」へ。**
 
-4. **設定を確かめて、反映する**（本番）
+5. **設定を確かめて、反映する**（本番）
 
    ```bash
    sudo nginx -t
@@ -3485,24 +3507,24 @@ New, TLSv1.3, Cipher is TLS_AES_256_GCM_SHA384
 
    期待：`syntax is ok` と `test is successful`、`active`。**`nginx -t` が失敗したら、reload せずに「戻す」へ。**
 
-5. **外から確かめる**（手元のターミナル）。0 と同じ手段で、変えたことが効いていることと、ほかが変わっていないことを見る。そのあと、ブラウザでトップを開いて表示されることを見る
+6. **外から確かめる**（手元のターミナル）。0 と同じ手段で、変えたことが効いていることと、ほかが変わっていないことを見る。そのあと、ブラウザでトップを開いて表示されることを見る
 
-6. **控えを消す**（本番。5 の確かめが済んでから）
+7. **控えを消す**（本番。6 の確かめが済んでから）
 
    ```bash
-   sudo rm /etc/nginx/sites-available/portfolio.bak
+   sudo rm "$bak"
    ls -l /etc/nginx/sites-available/
    ```
 
-   期待：`portfolio.bak` が無い。
+   期待：`portfolio.bak-年月日` が無い。
 
-7. **この節の写しを直し、突き合わせる**：上の設定のブロックを本番に合わせ、上の「本番と、このブロックを突き合わせる手段」で、全文の比較と `sha256sum` の両方で一致を見る（7-9e。7-7d と 7-9c は全文の比較だけだった）
+8. **この節の写しを直し、突き合わせる**：上の設定のブロックを本番に合わせ、上の「本番と、このブロックを突き合わせる手段」で、全文の比較と `sha256sum` の両方で一致を見る（7-9e。7-7d と 7-9c は全文の比較だけだった）
 
-**戻す**（3・4 で止めたとき、または 5 が期待と違うとき。本番）
+**戻す**（4・5 で止めたとき、または 6 が期待と違うとき。本番。2 と同じシェルで）
 
 ```bash
-sudo cp -p /etc/nginx/sites-available/portfolio.bak /etc/nginx/sites-available/portfolio
-diff /etc/nginx/sites-available/portfolio.bak /etc/nginx/sites-available/portfolio
+sudo cp -p "$bak" /etc/nginx/sites-available/portfolio
+diff "$bak" /etc/nginx/sites-available/portfolio
 sudo nginx -t
 ```
 
@@ -3512,7 +3534,9 @@ sudo nginx -t
 sudo systemctl reload nginx
 ```
 
-そのあと、5 と同じ手段で外から確かめる。戻す段は、3回のうち 7-9e の当日の手順にだけあった（写しの上で `cp` と `diff` を試した。本番では使っていない）。
+そのあと、6 と同じ手段で外から確かめる。戻す段は、3回のうち 7-9e の当日の手順にだけあった（写しの上で `cp` と `diff` を試した。本番では使っていない）。
+
+`/etc/nginx/sites-available/default-deny` を変えるときも、同じ流れを使う（ファイルの名前を読み替える）。ただし `default-deny` の写しには指紋の記録が無く、突き合わせは全文の比較だけである（この節の上、`default-deny` のブロックの【写し】の注記）。この流れで `default-deny` を変えたことは、まだ無い。
 
 ---
 
