@@ -3497,15 +3497,20 @@ New, TLSv1.3, Cipher is TLS_AES_256_GCM_SHA384
 
    期待：変えた行だけが出る。**これ以外の行が出たら、reload せずに「戻す」へ。**
 
-5. **設定を確かめて、反映する**（本番）
+5. **設定を確かめて、反映する**（本番）。確かめと反映は、別々に貼る。まとめて貼ると、`nginx -t` が失敗しても `reload` まで走るため
 
    ```bash
    sudo nginx -t
+   ```
+
+   期待：`syntax is ok` と `test is successful`。**失敗したら、次へ進まずに「戻す」へ。**
+
+   ```bash
    sudo systemctl reload nginx
    systemctl is-active nginx
    ```
 
-   期待：`syntax is ok` と `test is successful`、`active`。**`nginx -t` が失敗したら、reload せずに「戻す」へ。**
+   期待：`active`。
 
 6. **外から確かめる**（手元のターミナル）。0 と同じ手段で、変えたことが効いていることと、ほかが変わっていないことを見る。そのあと、ブラウザでトップを開いて表示されることを見る
 
