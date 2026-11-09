@@ -262,7 +262,7 @@
 
 | もの | 扱い |
 | --- | --- |
-| `.npmrc` の `ignore-scripts=true`（CI と開発の環境の `npm ci` にも効く） | 7-10 で扱う（台帳 41-8。7節） |
+| `.npmrc` の `ignore-scripts=true`（CI と開発の環境の `npm ci` にも効く） | 7-10 で扱う（台帳 41-8。7節） 【注記（2026-11-09）】7-10d で維持すると決め、理由と再検討の条件を記録した（7節の `.npmrc` の行）。理由の記録が無いものではなくなった |
 | CI の `tsc`・lint・ビルド・内容の検証の段を入れた意図 | 当時の記録は無い。6-1 の表に、7-9g で後から書いた意図を書いた（2026-11-04） |
 
 ## 7. 注意
@@ -279,7 +279,7 @@
 | `ImageService`（Spatie の最適化） | 道具が無いと、黙って何もしない可能性がある（確かめていない） | 7-8c で、実害が小さい、または今は起きないとして受け入れた | 画像を足すとき（台帳 41-7 の画像の道具の行） |
 | `resources/js/app.tsx` の `resolve` | 名前に合うページが無いと `TypeError` になる | 7-8c で、実害が小さい、または今は起きないとして受け入れた | — |
 | `ContactController`（スパムのときのログ） | スパムと判定したときに、IP アドレスと User-Agent をログに残す。ログは本番で35日で消える（`docs/environment.md` の `LOG_DAILY_DAYS`） | 誤検知の把握と分析のため。入力の内容は残さない | — |
-| `.npmrc` の `ignore-scripts=true` | `npm install`・`npm ci` は `prepare`（husky）を動かさない。新しく環境を作ったら、pre-commit のフックを手で入れる（`npm run prepare` で入ると見込んでいる。確かめていない）。husky は Git の設定の `core.hooksPath` でフックを効かせ、その設定は clone し直すと無くなる。`composer.json` の `setup` も `--ignore-scripts` で、フックは入らない。`post-create-project-cmd` は SQLite を作って migrate する（このアプリは DB を使わない） | 入れた理由は記録が無い。効果と代償は台帳 41-8 にある | 台帳 41-8（維持するか外すかが、まだ決まっていない） |
+| `.npmrc` の `ignore-scripts=true` | `npm install`・`npm ci` は `prepare`（husky）を動かさない。新しく環境を作ったら、pre-commit のフックを手で入れる（`npm run prepare` で入ると見込んでいる。確かめていない）。husky は Git の設定の `core.hooksPath` でフックを効かせ、その設定は clone し直すと無くなる。`composer.json` の `setup` も `--ignore-scripts` で、フックは入らない。`post-create-project-cmd` は SQLite を作って migrate する（このアプリは DB を使わない） | 入れた理由は記録が無い。効果と代償は台帳 41-8 にある 【更新（2026-11-09）】7-10d で維持すると決めた（人）。Laravel の雛形（`laravel/laravel` の 13.x）の `.npmrc` と同じ文面である（2026-11-09 に確かめた。このリポジトリに入った 2026-06-15 の時点の雛形は確かめていない）。インストールのときに動くスクリプトは、悪意のあるパッケージがよく使う経路で、それを止める。今の代償はほぼ無い。本番の依存に、インストールのときのスクリプトを持つものは0件で、開発の依存の `esbuild` はスクリプト無しで動いている（どちらも 2026-11-09 にコンテナで確かめた）。フックが入らないことは、この行の左の欄のとおり | 台帳 41-8（維持するか外すかが、まだ決まっていない） 【更新（2026-11-09）】インストールのときのスクリプトを要るパッケージを足すとき（症状：ネイティブのバイナリが無いという誤り）／Laravel の雛形からこの設定が消えたとき |
 | `resources/css/app.css` の `@variant md` | 区切りは `48rem`。ブラウザの既定の文字の大きさを変えた人では、768px と違う幅で切り替わる（クラスの `md:` と同じ幅になる） | クラスの `md:` と同じ条件にするため | — |
 | `resources/js/Components/ui/` の `Button`・`Card`・`Tag` | クラスを結合する1行が3か所にある | 共通の部分は1行だけで、抽象化に見合わないとして保留した（`Card.tsx` の冒頭） | — |
 | `Pages/Works/Show.tsx`・`Pages/About.tsx` の `Field` | 同じ形の部品が2か所にある | 見出しの段（h3 と h2）を意図して変えている | — |
@@ -287,7 +287,7 @@
 | `BaseLayout.tsx` のフッター | © の年は閲覧者の時計で決まる | ずれても年が1つ違うだけ | — |
 | `OptimizeImages`（済んだかの判定） | `filemtime` で判定する。checkout などで時刻が変わると結果が変わる | 外れても、作り直すか飛ばすかだけ。`--force` がある | — |
 | `ContactRequest`・`OptimizeImages` の `catch (Throwable)` | 捕まえる範囲が広い | `ContactRequest` は復号の失敗をすべて `invalid_token` にするため、`OptimizeImages` は1件の失敗で全体を止めないため（どちらもコメントにある） | — |
-| `.github/workflows/` の action | 版をタグで指定している。`upload-artifact` と `download-artifact` で版の数字が違う | 公式の action だけ。ハッシュに固定すると更新の手間が増える | 依存の更新の方針を決めるとき（台帳 41-12） |
+| `.github/workflows/` の action | 版をタグで指定している。`upload-artifact` と `download-artifact` で版の数字が違う | 公式の action だけ。ハッシュに固定すると更新の手間が増える 【更新（2026-11-09）】7-10d で、タグのまま指すと決めた。理由は手順書30節の「CI ワークフローの整理（7-4g）」の【追記（2026-11-09）】。`shivammathur/setup-php` は GitHub 自身が作る action ではない（秘密の値を使わない `ci.yml` にだけある） | 依存の更新の方針を決めるとき（台帳 41-12） 【更新（2026-11-09）】秘密の値を使うワークフローに、ほかの作り手の action を足すとき／使っている action が付け替えられた事件の告知を見たとき |
 | `bin/rollback.sh` | 引数の世代名を確かめない | 人がサーバーで手で動かす。指定した世代の `build` が無ければ止まる | — |
 | `bin/deploy.sh` | 取り込みの途中のディレクトリ（`.incoming-*`）をすべて消す。同時に動かないことは `deploy.yml` の `concurrency` に頼る | 起動の経路は GitHub Actions のデプロイだけ | — |
 | `SitemapController` | slug を URL エンコードせずに入れる（XML のエスケープだけ） | slug はファイル名で、英数字とハイフンだけで付けている | slug に別の文字を使うとき |
