@@ -1,5 +1,7 @@
 # portfolio-engineer
 
+<!-- 下の1文目を変えたら、GitHub のリポジトリの説明も直す（docs/development.md の4節） -->
+
 Kotaro Izaki のポートフォリオサイトのソースコードです。このサイト自体が、設計から本番の運用までを記録しながら作った作品の1つです。
 
 サイト：https://new.ikshowcase.site

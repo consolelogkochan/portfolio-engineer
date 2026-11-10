@@ -63,6 +63,9 @@
 | 事実 | 正 | ほかの場所の引き方 |
 | --- | --- | --- |
 | サイト名 | `config/page_meta.php` の `site_name` | `PageMetaBuilder::siteName()` を経由する。画面には `HandleInertiaRequests::share()` の `siteName` で届く。エラーのページには `bootstrap/app.php` が直接渡す |
+| トップの meta の説明 | `config/page_meta.php` の `pages` の `home` の `description`（先頭はトップの h1 の写し。4節） | `HomeController` が `PageMetaBuilder::build('home')` で読み、`resources/views/app.blade.php` が `description`・`og:description`・`twitter:description` に出す。ほかの固定のページ（Works 一覧・Contact）も、同じ形で `pages` の各キーから読む |
+| OGP の既定画像 | `config/page_meta.php` の `default_og_image` | `PageMetaBuilder::build()` が、上書きの `ogImage` が無いときに使い、`absoluteUrl()` で絶対 URL にする。`app.blade.php` が `og:image`・`twitter:image` に出す。作品の詳細は作品の `ogImage`、開発ログの詳細は同じ slug の作品の `ogImage` があれば、それを使う（`WorkController::show()`・`LogController::show()`）。トップ・一覧・About・Contact・エラーのページは既定のまま |
+| 作品の `summary` | `content/works/*.md` の front matter の `summary` | 画面：Works 一覧のカード（`WorkCard.tsx`）、トップのショーケース（`FeaturedShowcase.tsx`）、作品詳細の「概要」（`Works/Show.tsx`）。meta：`WorkController::show()` が `description` として `PageMetaBuilder::build()` に渡し、`app.blade.php` が `description`・`og:description`・`twitter:description` に出す。開発ログの詳細の meta は、開発ログ自身の `summary` を使う（`LogController::show()`）。og:image の既定の画像の中の文字にも写っている（4節） |
 | ページのタイトルの区切り | `PageMetaBuilder::titleSuffix()` | エラーのページは `titleSuffix` を props で受け取り、結合だけを行う（`ErrorPage.tsx`） |
 | サイトの絶対 URL | `PageMetaBuilder::absoluteUrl()`（`config('app.url')` を基点にする） | サイトマップ（`SitemapController`）と robots.txt（`routes/web.php`）もここを呼ぶ |
 | スパムの判定の秒数と URL の数、画像の幅と品質 | `config/spam.php`・`config/image.php` | 呼び出し側（`ContactRequest`・`OptimizeImages`）は既定値を書かずに読む。キーがあることを `ConfigKeysTest` が確かめる。テスト（`ContactTest`）も設定から値を作る |
@@ -84,6 +87,8 @@
 
 正が2つ以上あり、まとめずに残しているもの。
 
+【注記（2026-11-10）】正が1つで、写しが README・GitHub の画面・画像の中にあり、ずれに気づく経路が無いものも、この表に置く（7-10e）。正を変えるコミットで、この表を見て写しも直す。GitHub の画面の欄はリポジトリの外にあり、今の中身は 2026-11-10 には確かめていない
+
 | 事実 | 場所 | 片方を変えたら | まとめない理由 | 一致を保つ方法 |
 | --- | --- | --- | --- | --- |
 | 作品と開発ログの既定値（`.default(...)`） | `types/work.ts`・`types/log.ts` と、`ContentRepository` の `WORK_DEFAULTS`・`LOG_DEFAULTS` | もう片方も同じ値にする | TS は内容の検証と型のため、PHP は画面に渡す値のため。既定値を JSON のファイルに置いて両方から読む案は、少ない値のために読み込みの仕組みが増え、見合わないとして採らなかった（7-8b-5）。再検討の条件：TS と PHP の値が食い違うことが起きたとき、または既定値のある項目が増えたとき | PHP の値はテストで保つ（`ContentDefaultsTest`）。2か所の一致は、**仕組みは無い。人が同じコミットで直す** |
@@ -103,6 +108,14 @@
 | CI とデプロイのビルドの手順（`npm` のコマンドと段の構成） | `.github/workflows/ci.yml` の `npm ci`・`npm run build` と、`deploy.yml` の `build` ジョブ | もう片方も同じにする | 検査と、本番に載るビルドが、別のワークフローに分かれている（手順書21節・30節）。ずれると、CI が緑でも本番に載る成果物が検証したものと違いうる | **仕組みは無い。人が同じコミットで直す**（手順書40節の維持依存の索引、21節） |
 | 作品の `metrics` の数（CI の自動検査・テスト） | `content/works/portfolio-engineer.md` の `metrics` と、`ci.yml`・`php artisan test`（数え方は6節） | テストや CI の段を変えるコミットで、同じく `metrics` の数も直す。数が変わっただけでは、作品詳細の gallery の画像は撮り直さない（画面の写真は撮った時点のもの） | ページの構成として、数があったほうが視覚の印象が違う。数の裏づけは6節の一覧（人。7-9g） | **仕組みは無い。人が同じコミットで直す** |
 | 公開の後の運用 | 正は手順書（`docs/server-setup.md`）と台帳（`docs/ledger.md`）。一覧は `docs/operations.md` | `docs/operations.md` も直す | 一目で網羅を点検するための索引で、正の記録の置き場所とは目的が違う | **仕組みは無い。人が同じコミットで直す** |
+| README の「技術スタック」 | 正：`composer.json`・`package.json`。写し：`README.md` の「技術スタック」 | 大きな版を上げたら（Laravel・PHP・React・TypeScript・Tailwind CSS など）、写しも直す | 読む人への案内で、正のファイルをそのまま見せる形にしていない | **無い。正を変えるときに、この行を見て直す** |
+| README の「構成」（フォルダの木と、`docs/` の各文書の説明） | 正：リポジトリのフォルダと各文書。写し：`README.md` の「構成」 | フォルダや文書を足す・消す・役目を変えたら、写しも直す | 同上 | **無い。正を変えるときに、この行を見て直す** |
+| README の画像 | 正：サイトのトップの画面。写し：`docs/images/readme-top.webp`（中身は gallery の `top-v3.webp` と同じ。2節） | トップの見た目を変えたら、撮り直すかを決める | 画面の写真は、撮った時点のもの | **無い。正を変えるときに、この行を見て直す** |
+| GitHub のリポジトリの説明（リポジトリの外） | 正：`README.md` の冒頭の説明の文（見出しの下の1文目）。写し：GitHub のリポジトリの説明（その文を短くしたもの） | 正を変えたら、写しも直す（`README.md` の冒頭のコメントが、この行を指す） | GitHub の画面の欄で、リポジトリのファイルからは作られない | **無い。正を変えるときに、この行を見て直す** |
+| GitHub のリポジトリの Web サイトの欄と、プロフィールの URL の欄（リポジトリの外） | 正：サイトの URL（本番の `.env` の `APP_URL`。手順書19節）。写し：2つの欄と、`README.md` の冒頭の「サイト：」の行 | サイトの URL を変えたら、3か所とも直す | 同上。README の行は、読む人への案内 | **無い。正を変えるときに、この行を見て直す** |
+| GitHub のプロフィールの Bio（リポジトリの外） | 正：`content/about.md` の「取り組んでいること」「どう進めてきたか」。写し：GitHub のプロフィールの Bio | 正を変えたら、写しも直す（`content/about.md` の front matter のコメントが、この行を指す） | GitHub の画面の欄で、リポジトリのファイルからは作られない | **無い。正を変えるときに、この行を見て直す** |
+| og:image の既定の画像の中の文字 | 正：`content/works/portfolio-engineer.md` の `title` と `summary`。写し：`public/images/og/site.png` の中の文字 | 正を変えたら、画像を作り直す（手順書40節） | 画像の中の文字は、テストも検査も見ない（手順書40節が受け入れている） | **無い。正を変えるときに、この行を見て直す** |
+| 作品詳細の gallery の画面の写真 | 正：サイトの画面。写し：作品の front matter の `gallery` の画像 | 撮り直すかは、手順書40節の撮り直しの条件で決める（数が変わっただけでは撮り直さない。上の `metrics` の行） | 画面の写真は、撮った時点のもの | **無い。正を変えるときに、この行を見て直す** |
 
 ## 5. 様式の規則
 
