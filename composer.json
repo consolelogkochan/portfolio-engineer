@@ -79,6 +79,11 @@
         "allow-plugins": {
             "pestphp/pest-plugin": true,
             "php-http/discovery": true
+        },
+        "audit": {
+            "ignore": {
+                "GHSA-63hm-g96r-2m2q": "Concurrency::run() を使っていないため当たらない（7-10i の割り込み、2026-11-14）。laravel/framework を 13.40.0 以上に上げたら、この行を消す"
+            }
         }
     },
     "minimum-stability": "stable",
